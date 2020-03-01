@@ -98,7 +98,8 @@ public abstract class AbstractServiceRegistrar implements ServiceRegistrar {
                     else {
                         m.put(rpcInterface, o);
                     }
-                }, HashMap::putAll).entrySet()
+                }, HashMap::putAll)
+                .entrySet()
                 .stream()
                 .collect(ArrayList::new,
                         (l, e) -> l.add(doRegist((Class<?>) e.getKey(), e.getValue())),
