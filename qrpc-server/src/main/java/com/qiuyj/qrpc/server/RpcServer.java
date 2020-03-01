@@ -86,8 +86,9 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
         if (Objects.isNull(rpcServices)) {
             throw new NullPointerException("rpcServices");
         }
-        List<ServiceProxy> serviceProxies = List.of();
+        List<ServiceProxy> serviceProxies;
         if (rpcServices.isEmpty()) {
+            serviceProxies = List.of();
             LOG.warn("Empty rpcServiecs and do nothing");
         }
         else {
@@ -101,8 +102,9 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
         if (Objects.isNull(rpcServices)) {
             throw new NullPointerException("rpcServices");
         }
-        List<ServiceProxy> serviceProxies = Collections.emptyList();
+        List<ServiceProxy> serviceProxies;
         if (rpcServices.isEmpty()) {
+            serviceProxies = Collections.emptyList();
             LOG.warn("Empty rpcServiecs and do nothing");
         }
         else {
