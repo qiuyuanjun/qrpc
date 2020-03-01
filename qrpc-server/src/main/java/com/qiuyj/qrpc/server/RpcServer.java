@@ -1,6 +1,5 @@
 package com.qiuyj.qrpc.server;
 
-import com.qiuyj.qrpc.Lifecycle;
 import com.qiuyj.qrpc.logger.InternalLogger;
 import com.qiuyj.qrpc.logger.InternalLoggerFactory;
 import com.qiuyj.qrpc.service.ServiceProxy;
@@ -56,6 +55,11 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
         }
     }
 
+    @Override
+    public boolean isRunning() {
+        return false;
+    }
+
     protected abstract void internalShutdown();
 
     //--------------------------------ServiceRegistrar
@@ -65,7 +69,18 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
         if (Objects.isNull(rpcService)) {
             throw new NullPointerException("rpcService");
         }
-        return serviceProxyContainer.regist(rpcService);
+        Optional<ServiceProxy> serviceProxy = serviceProxyContainer.regist(rpcService);
+        serviceProxy.ifPresent(this::registToServiceRegistrationIfNecessary);
+        return serviceProxy;
+    }
+
+    private void registToServiceRegistrationIfNecessary(ServiceProxy serviceProxy) {
+        if (isRunning()) {
+            // todo 将服务注册到服务注册中心上去
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Regist service: {} to service registration", serviceProxy);
+            }
+        }
     }
 
     @Override
@@ -77,7 +92,9 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
             throw new NullPointerException("rpcService");
         }
         else {
-            return serviceProxyContainer.regist(interfaceClass, rpcService);
+            Optional<ServiceProxy> serviceProxy = serviceProxyContainer.regist(interfaceClass, rpcService);
+            serviceProxy.ifPresent(this::registToServiceRegistrationIfNecessary);
+            return serviceProxy;
         }
     }
 
@@ -93,8 +110,16 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
         }
         else {
             serviceProxies = serviceProxyContainer.<E>registAll(rpcServices);
+            multiRegistToServiceRegistrationIfNecessary(serviceProxies);
         }
         return serviceProxies;
+    }
+
+    private void multiRegistToServiceRegistrationIfNecessary(List<ServiceProxy> serviceProxies) {
+        if (isRunning() && !serviceProxies.isEmpty()) {
+            // todo 将服务注册到服务注册中心上去
+
+        }
     }
 
     @Override
@@ -109,6 +134,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
         }
         else {
             serviceProxies = serviceProxyContainer.<E>registAll(rpcServices);
+            multiRegistToServiceRegistrationIfNecessary(serviceProxies);
         }
         return serviceProxies;
     }
