@@ -23,16 +23,17 @@ public class DefaultServiceProxyContainer extends AbstractServiceRegistrar imple
     private ReadWriteLock serviceProxyMapLock = new ReentrantReadWriteLock();
 
     @Override
-    protected void doRegist(Class<?> interfaceClass, Object rpcService) {
+    protected ServiceProxy doRegist(Class<?> interfaceClass, Object rpcService) {
         if (!interfaceClass.isInterface()) {
             throw new IllegalArgumentException("Class: " + interfaceClass + " is not an interface class");
         }
+        ServiceProxy serviceProxy;
         serviceProxyMapLock.writeLock().lock();
         try {
             if (serviceProxyMap.containsKey(interfaceClass)) {
                 throw new IllegalStateException("RPC instance object with interface name: " + interfaceClass + " already exists");
             }
-            serviceProxyMap.put(interfaceClass, new ServiceProxy(interfaceClass, rpcService));
+            serviceProxyMap.put(interfaceClass, serviceProxy = new ServiceProxy(interfaceClass, rpcService));
         }
         finally {
             serviceProxyMapLock.writeLock().unlock();
@@ -41,6 +42,7 @@ public class DefaultServiceProxyContainer extends AbstractServiceRegistrar imple
         if (LOG.isDebugEnabled()) {
             LOG.debug("Regist rpc service {} with interface {}", rpcService, interfaceClass);
         }
+        return serviceProxy;
     }
 
     @Override

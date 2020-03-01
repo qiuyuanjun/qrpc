@@ -12,17 +12,23 @@ public class ServiceProxy {
 
     private final Object proxyObject;
 
+    private final Class<?> interfaceClass;
+
     /**
      * 所有的rpc方法
      */
     private Map<String, Method> rpcMethods = new HashMap<>();
 
     public ServiceProxy(Class<?> interfaceClass, Object rpcService) {
+        this.interfaceClass = interfaceClass;
         this.proxyObject = rpcService;
-
     }
 
     public Object getObject() {
         return proxyObject;
+    }
+
+    public Class<?> getInterface() {
+        return interfaceClass;
     }
 }

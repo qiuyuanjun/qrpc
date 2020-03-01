@@ -3,12 +3,16 @@ package com.qiuyj.qrpc.server;
 import com.qiuyj.qrpc.Lifecycle;
 import com.qiuyj.qrpc.logger.InternalLogger;
 import com.qiuyj.qrpc.logger.InternalLoggerFactory;
+import com.qiuyj.qrpc.service.ServiceProxy;
 import com.qiuyj.qrpc.service.ServiceProxyContainer;
 import com.qiuyj.qrpc.service.ServiceRegistrar;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * rpc服务器，接收所有的rpc客户端请求，并将所处理的结果返回给rpc客户端
@@ -57,49 +61,53 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
     //--------------------------------ServiceRegistrar
 
     @Override
-    public <E> void regist(E rpcService) {
+    public <E> Optional<ServiceProxy> regist(E rpcService) {
         if (Objects.isNull(rpcService)) {
             throw new NullPointerException("rpcService");
         }
-        serviceProxyContainer.regist(rpcService);
+        return serviceProxyContainer.regist(rpcService);
     }
 
     @Override
-    public <E> void regist(Class<? super E> interfaceClass, E rpcService) {
+    public <E> Optional<ServiceProxy> regist(Class<? super E> interfaceClass, E rpcService) {
         if (Objects.isNull(interfaceClass)) {
-            regist(rpcService);
+            return regist(rpcService);
         }
         else if (Objects.isNull(rpcService)) {
             throw new NullPointerException("rpcService");
         }
         else {
-            serviceProxyContainer.regist(interfaceClass, rpcService);
+            return serviceProxyContainer.regist(interfaceClass, rpcService);
         }
     }
 
     @Override
-    public <E> void registAll(Collection<?> rpcServices) {
+    public <E> List<ServiceProxy> registAll(Collection<?> rpcServices) {
         if (Objects.isNull(rpcServices)) {
             throw new NullPointerException("rpcServices");
         }
-        else if (rpcServices.isEmpty()) {
+        List<ServiceProxy> serviceProxies = List.of();
+        if (rpcServices.isEmpty()) {
             LOG.warn("Empty rpcServiecs and do nothing");
         }
         else {
-            serviceProxyContainer.<E>registAll(rpcServices);
+            serviceProxies = serviceProxyContainer.<E>registAll(rpcServices);
         }
+        return serviceProxies;
     }
 
     @Override
-    public <E> void registAll(Map<Class<?>, ?> rpcServices) {
+    public <E> List<ServiceProxy> registAll(Map<Class<?>, ?> rpcServices) {
         if (Objects.isNull(rpcServices)) {
             throw new NullPointerException("rpcServices");
         }
-        else if (rpcServices.isEmpty()) {
+        List<ServiceProxy> serviceProxies = Collections.emptyList();
+        if (rpcServices.isEmpty()) {
             LOG.warn("Empty rpcServiecs and do nothing");
         }
         else {
-            serviceProxyContainer.<E>registAll(rpcServices);
+            serviceProxies = serviceProxyContainer.<E>registAll(rpcServices);
         }
+        return serviceProxies;
     }
 }
