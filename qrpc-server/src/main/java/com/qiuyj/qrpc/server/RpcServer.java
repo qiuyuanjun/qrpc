@@ -5,6 +5,7 @@ import com.qiuyj.qrpc.logger.InternalLoggerFactory;
 import com.qiuyj.qrpc.service.ServiceProxy;
 import com.qiuyj.qrpc.service.ServiceProxyContainer;
 import com.qiuyj.qrpc.service.ServiceRegistrar;
+import com.qiuyj.qrpc.utils.Partition;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -76,10 +77,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
 
     private void registToServiceRegistrationIfNecessary(ServiceProxy serviceProxy) {
         if (isRunning()) {
-            // todo 将服务注册到服务注册中心上去
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Regist service: {} to service registration", serviceProxy);
-            }
+            multiRegistToServiceRegistrationIfNecessary(List.of(serviceProxy));
         }
     }
 
@@ -117,8 +115,16 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
 
     private void multiRegistToServiceRegistrationIfNecessary(List<ServiceProxy> serviceProxies) {
         if (isRunning() && !serviceProxies.isEmpty()) {
-            // todo 将服务注册到服务注册中心上去
+            Partition<ServiceProxy> serviceProxyPartition = new Partition<>(serviceProxies);
+            while (serviceProxyPartition.hasNext()) {
+                List<ServiceProxy> sub = serviceProxyPartition.next();
 
+                // todo 将服务注册到服务注册中心上去
+            }
+
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Regist service: {} to service registration", serviceProxies);
+            }
         }
     }
 
