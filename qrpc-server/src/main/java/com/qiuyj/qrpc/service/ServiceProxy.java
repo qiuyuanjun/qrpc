@@ -40,6 +40,8 @@ public class ServiceProxy {
              Objects.nonNull(inter) && Object.class != inter;
              inter = inter.getSuperclass()) {
             for (Method m : inter.getDeclaredMethods()) {
+                // java8及以上允许接口中有static方法，java9及以上允许接口中有private方法
+                // 这两种modifier的方法都要排除
                 if (Modifier.isStatic(m.getModifiers()) || Modifier.isPrivate(m.getModifiers())) {
                     continue;
                 }
