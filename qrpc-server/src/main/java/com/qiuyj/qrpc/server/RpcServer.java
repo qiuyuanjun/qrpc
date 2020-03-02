@@ -35,6 +35,10 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
         this.serviceProxyContainer = serviceProxyContainer;
     }
 
+    public void configure() {
+
+    }
+
     //--------------------------------Lifecycle
 
     @Override

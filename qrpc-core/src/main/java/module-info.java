@@ -6,5 +6,7 @@ module qrpc.core {
     requires transitive qrpc.log;
 
     exports com.qiuyj.qrpc;
+    exports com.qiuyj.qrpc.annotation;
+    exports com.qiuyj.qrpc.filter;
     exports com.qiuyj.qrpc.utils to qrpc.server;
 }

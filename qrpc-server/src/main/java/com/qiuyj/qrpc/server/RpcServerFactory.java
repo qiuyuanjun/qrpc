@@ -22,7 +22,10 @@ public abstract class RpcServerFactory {
         // for private
     }
 
-    public static RpcServer createServer() {
+    /**
+     * 创建默认的{@code RpcServer}实例
+     */
+    public static RpcServer createDefault() {
         // 1、创建RpcServerConfig对象
         RpcServerConfig serverConfig = RpcServerConfig.createDefault();
         if (LOG.isDebugEnabled()) {
@@ -34,6 +37,8 @@ public abstract class RpcServerFactory {
         DefaultServiceProxyContainer container = new DefaultServiceProxyContainer();
         container.setIgnoreTypeMismatch(serverConfig.isIgnoreTypeMismatch());
         rpcServer.setServiceProxyContainer(container);
+
+        rpcServer.configure();
         return rpcServer;
     }
 
