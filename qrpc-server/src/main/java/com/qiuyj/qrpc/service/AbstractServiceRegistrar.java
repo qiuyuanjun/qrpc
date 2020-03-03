@@ -134,4 +134,16 @@ public abstract class AbstractServiceRegistrar implements ServiceRegistrar {
      * @param rpcService rpc服务实例对象
      */
     protected abstract ServiceDescriptor doRegist(Class<?> interfaceClass, Object rpcService);
+
+    @Override
+    public boolean unregistAll(List<ServiceDescriptor> serviceDescriptors) {
+        serviceDescriptors.forEach(sd -> doUnregist(sd.getInterface()));
+        return true;
+    }
+
+    /**
+     * 具体的注销方法，交给子类实现
+     * @param interfaceClass rpc接口
+     */
+    protected abstract void doUnregist(Class<?> interfaceClass);
 }

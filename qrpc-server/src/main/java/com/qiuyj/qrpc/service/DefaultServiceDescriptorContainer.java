@@ -52,6 +52,17 @@ public class DefaultServiceDescriptorContainer extends AbstractServiceRegistrar 
     }
 
     @Override
+    protected void doUnregist(Class<?> interfaceClass) {
+        serviceDescriptorMapLock.writeLock().lock();
+        try {
+            serviceDescriptorMap.remove(interfaceClass);
+        }
+        finally {
+            serviceDescriptorMapLock.writeLock().unlock();
+        }
+    }
+
+    @Override
     public <E> ServiceDescriptor get(Class<? super E> interfaceClass) {
         Objects.requireNonNull(interfaceClass, "interfaceClass");
         serviceDescriptorMapLock.readLock().lock();

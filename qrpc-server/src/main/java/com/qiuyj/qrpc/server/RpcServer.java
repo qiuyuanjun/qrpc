@@ -131,9 +131,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
 
     @Override
     public <E> List<ServiceDescriptor> registAll(Collection<?> rpcServices) {
-        if (Objects.isNull(rpcServices)) {
-            throw new NullPointerException("rpcServices");
-        }
+        Objects.requireNonNull(rpcServices, "rpcServices");
         List<ServiceDescriptor> serviceDescriptors;
         if (rpcServices.isEmpty()) {
             serviceDescriptors = List.of();
@@ -151,7 +149,17 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
             Partition<ServiceDescriptor> serviceProxyPartition = new Partition<>(serviceDescriptors);
             while (serviceProxyPartition.hasNext()) {
                 List<ServiceDescriptor> sub = serviceProxyPartition.next();
-                asyncServiceRegistrationQueue.add(sub);
+                if (!asyncServiceRegistrationQueue.offer(sub)) {
+                    // 此时，注册队列已经满了，那么注册失败，移除之前注册的所有服务
+                    unregistAll(serviceDescriptors);
+                    throw new IllegalStateException("asyncServiceRegistrationQueue has been fulled");
+                }
+//                try {
+//                    asyncServiceRegistrationQueue.put(sub);
+//                }
+//                catch (InterruptedException e) {
+//                    throw new IllegalStateException(e);
+//                }
             }
 
             if (LOG.isDebugEnabled()) {
@@ -162,9 +170,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
 
     @Override
     public <E> List<ServiceDescriptor> registAll(Map<Class<?>, ?> rpcServices) {
-        if (Objects.isNull(rpcServices)) {
-            throw new NullPointerException("rpcServices");
-        }
+        Objects.requireNonNull(rpcServices, "rpcServices");
         List<ServiceDescriptor> serviceDescriptors;
         if (rpcServices.isEmpty()) {
             serviceDescriptors = Collections.emptyList();
@@ -175,6 +181,12 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
             multiRegistToServiceRegistrationIfNecessary(serviceDescriptors);
         }
         return serviceDescriptors;
+    }
+
+    @Override
+    public boolean unregistAll(List<ServiceDescriptor> serviceDescriptors) {
+        Objects.requireNonNull(serviceDescriptors, "serviceDescriptor");
+        return !serviceDescriptors.isEmpty() && serviceDescriptorContainer.unregistAll(serviceDescriptors);
     }
 
     private class AsyncServiceRegistrationThread extends QrpcThread {

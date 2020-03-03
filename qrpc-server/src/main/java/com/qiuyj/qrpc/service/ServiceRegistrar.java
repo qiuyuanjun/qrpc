@@ -20,4 +20,6 @@ public interface ServiceRegistrar {
     <E> List<ServiceDescriptor> registAll(Collection<?> rpcServices);
 
     <E> List<ServiceDescriptor> registAll(Map<Class<?>, ?> rpcServices);
+
+    boolean unregistAll(List<ServiceDescriptor> serviceDescriptors);
 }
