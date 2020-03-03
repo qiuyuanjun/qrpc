@@ -2,7 +2,8 @@ package com.qiuyj.qrpc.server;
 
 import com.qiuyj.qrpc.logger.InternalLogger;
 import com.qiuyj.qrpc.logger.InternalLoggerFactory;
-import com.qiuyj.qrpc.service.DefaultServiceProxyContainer;
+import com.qiuyj.qrpc.service.DefaultServiceDescriptorContainer;
+import com.qiuyj.qrpc.service.ServiceDescriptorContainer;
 import com.qiuyj.qrpc.utils.ClassUtils;
 
 import java.lang.reflect.Constructor;
@@ -16,7 +17,7 @@ public abstract class RpcServerFactory {
 
     static final InternalLogger LOG = InternalLoggerFactory.getLogger(RpcServerFactory.class);
 
-    private static final Class<?>[] RPC_SERVER_CLASS_CONSTRUCTOR_ARGS = { RpcServerConfig.class };
+    private static final Class<?>[] RPC_SERVER_CLASS_CONSTRUCTOR_ARGS = { RpcServerConfig.class, ServiceDescriptorContainer.class };
 
     private RpcServerFactory() {
         // for private
@@ -31,24 +32,22 @@ public abstract class RpcServerFactory {
         if (LOG.isDebugEnabled()) {
             LOG.debug(serverConfig.toString());
         }
-        // 2、创建对应的服务器
-        RpcServer rpcServer = newInstance(serverConfig);
-        // 3、初始化server
-        DefaultServiceProxyContainer container = new DefaultServiceProxyContainer();
-        container.setIgnoreTypeMismatch(serverConfig.isIgnoreTypeMismatch());
-        rpcServer.setServiceProxyContainer(container);
-
+        // 2、创建ServiceDescriptorContainer对象
+        ServiceDescriptorContainer sdContainer = new DefaultServiceDescriptorContainer(serverConfig.isIgnoreTypeMismatch());
+        // 3、创建对应的服务器
+        RpcServer rpcServer = newInstance(serverConfig, sdContainer);
+        // 4、配置rpcServer
         rpcServer.configure();
         return rpcServer;
     }
 
     @SuppressWarnings("unchecked")
-    private static RpcServer newInstance(RpcServerConfig config) {
+    private static RpcServer newInstance(RpcServerConfig config, ServiceDescriptorContainer sdContainer) {
         Class<? extends RpcServer> serverClass = config.getRpcServerClass();
         Constructor<? extends RpcServer> serverCtor =
                 (Constructor<? extends RpcServer>) ClassUtils.getConstructor(serverClass, RPC_SERVER_CLASS_CONSTRUCTOR_ARGS);
         try {
-            return serverCtor.newInstance(config);
+            return serverCtor.newInstance(config, sdContainer);
         }
         catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
             throw new IllegalStateException("Error instantiating constructor", e);

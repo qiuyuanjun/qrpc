@@ -24,6 +24,8 @@ public class RpcServerConfig {
 
     private String rpcServerClassName = DEFAULT_RPC_SERVER_CLASS_NAME;
 
+    private int asyncServiceRegistrationQueueSize = 50;
+
     public RpcServerConfig(Properties properties) {
         this(new HashMap<>(properties));
     }
@@ -36,6 +38,9 @@ public class RpcServerConfig {
             }
             else if ("rpcServerClassName".equals(k)) {
                 rpcServerClassName = val;
+            }
+            else if ("asyncServiceRegistrationQueueSize".equals(k)) {
+                asyncServiceRegistrationQueueSize = Integer.parseInt(val);
             }
         });
     }
@@ -55,6 +60,10 @@ public class RpcServerConfig {
             serverClass = NioRpcServer.class;
         }
         return serverClass;
+    }
+
+    public int getAsyncServiceRegistrationQueueSize() {
+        return asyncServiceRegistrationQueueSize;
     }
 
     static RpcServerConfig createDefault() {

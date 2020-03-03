@@ -22,6 +22,14 @@ public abstract class AbstractServiceRegistrar implements ServiceRegistrar {
 
     private boolean ignoreTypeMismatch;
 
+    protected AbstractServiceRegistrar() {
+        // do nothing
+    }
+
+    protected AbstractServiceRegistrar(boolean ignoreTypeMismatch) {
+        this.ignoreTypeMismatch = ignoreTypeMismatch;
+    }
+
     public void setIgnoreTypeMismatch(boolean ignoreTypeMismatch) {
         this.ignoreTypeMismatch = ignoreTypeMismatch;
     }
@@ -67,26 +75,26 @@ public abstract class AbstractServiceRegistrar implements ServiceRegistrar {
     }
 
     @Override
-    public <E> Optional<ServiceProxy> regist(E rpcService) {
+    public <E> Optional<ServiceDescriptor> regist(E rpcService) {
         return regist((Class<? super E>) getRpcInterface(rpcService), rpcService);
     }
 
     @Override
-    public <E> Optional<ServiceProxy> regist(Class<? super E> interfaceClass, E rpcService) {
-        ServiceProxy serviceProxy = null;
+    public <E> Optional<ServiceDescriptor> regist(Class<? super E> interfaceClass, E rpcService) {
+        ServiceDescriptor serviceDescriptor = null;
         if (Objects.isNull(checkType(interfaceClass, rpcService))) {
             // 忽略类型不匹配的情况，那么就记录日志，并且忽略当前的注册
             LOG.warn("Type mismatch, rpc service: {} is not an instance of interface: {}, and ignore regist",
                     rpcService, interfaceClass);
         }
         else {
-            serviceProxy = doRegist(interfaceClass, rpcService);
+            serviceDescriptor = doRegist(interfaceClass, rpcService);
         }
-        return Optional.ofNullable(serviceProxy);
+        return Optional.ofNullable(serviceDescriptor);
     }
 
     @Override
-    public <E> List<ServiceProxy> registAll(Collection<?> rpcServices) {
+    public <E> List<ServiceDescriptor> registAll(Collection<?> rpcServices) {
         return rpcServices.stream()
                 .collect(HashMap::new, (m, o) -> {
                     Class<?> rpcInterface = getRpcInterface(o);
@@ -107,7 +115,7 @@ public abstract class AbstractServiceRegistrar implements ServiceRegistrar {
     }
 
     @Override
-    public <E> List<ServiceProxy> registAll(Map<Class<?>, ?> rpcServices) {
+    public <E> List<ServiceDescriptor> registAll(Map<Class<?>, ?> rpcServices) {
         if (!ignoreTypeMismatch) {
             // 如果ignoreTypeMismatch为true，那么注册之前，要先对所有的进行类型检查
             rpcServices.forEach(this::checkType);
@@ -125,5 +133,5 @@ public abstract class AbstractServiceRegistrar implements ServiceRegistrar {
      * @param interfaceClass rpc接口
      * @param rpcService rpc服务实例对象
      */
-    protected abstract ServiceProxy doRegist(Class<?> interfaceClass, Object rpcService);
+    protected abstract ServiceDescriptor doRegist(Class<?> interfaceClass, Object rpcService);
 }

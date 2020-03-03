@@ -1,9 +1,10 @@
 package com.qiuyj.qrpc.server;
 
+import com.qiuyj.qrpc.QrpcThread;
 import com.qiuyj.qrpc.logger.InternalLogger;
 import com.qiuyj.qrpc.logger.InternalLoggerFactory;
-import com.qiuyj.qrpc.service.ServiceProxy;
-import com.qiuyj.qrpc.service.ServiceProxyContainer;
+import com.qiuyj.qrpc.service.ServiceDescriptor;
+import com.qiuyj.qrpc.service.ServiceDescriptorContainer;
 import com.qiuyj.qrpc.service.ServiceRegistrar;
 import com.qiuyj.qrpc.utils.Partition;
 
@@ -13,6 +14,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * rpc服务器，接收所有的rpc客户端请求，并将所处理的结果返回给rpc客户端
@@ -23,16 +27,23 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
 
     private static final InternalLogger LOG = InternalLoggerFactory.getLogger(RpcServer.class);
 
+    private BlockingQueue<List<ServiceDescriptor>> asyncServiceRegistrationQueue;
+
     private RpcServerConfig config;
 
-    private ServiceProxyContainer serviceProxyContainer;
+    private ServiceDescriptorContainer serviceDescriptorContainer;
 
-    protected RpcServer(RpcServerConfig config) {
+    /**
+     * rpc服务器运行状态
+     */
+    private final AtomicBoolean running = new AtomicBoolean();
+
+    private Thread asyncServiceRegistrationThread;
+
+    protected RpcServer(RpcServerConfig config, ServiceDescriptorContainer serviceDescriptorContainer) {
         this.config = config;
-    }
-
-    public void setServiceProxyContainer(ServiceProxyContainer serviceProxyContainer) {
-        this.serviceProxyContainer = serviceProxyContainer;
+        this.serviceDescriptorContainer = serviceDescriptorContainer;
+        asyncServiceRegistrationQueue = new LinkedBlockingQueue<>(config.getAsyncServiceRegistrationQueueSize());
     }
 
     public void configure() {
@@ -43,9 +54,16 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
 
     @Override
     public void start() {
+        List<ServiceDescriptor> serviceDescriptors = serviceDescriptorContainer.getAll();
+        if (!running.compareAndSet(false, true)) {
+            throw new IllegalStateException("Rpc server has already start");
+        }
         // 1、初始化所有的过滤器
         // 2、将所有注册的服务暴露到服务注册中心（如果支持服务注册中心）
-        // 3、启动socket服务器
+        // 3、启动异步线程，注册运行期间注册的服务
+        asyncServiceRegistrationThread = new AsyncServiceRegistrationThread();
+        asyncServiceRegistrationThread.start();
+        // 4、启动socket服务器
         internalStart(config);
     }
 
@@ -53,16 +71,27 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
 
     @Override
     public void shutdown() {
-        internalShutdown();
-
-        if (Objects.nonNull(serviceProxyContainer)) {
-            serviceProxyContainer.clear();
+        if (!running.compareAndSet(true, false)) {
+            throw new IllegalStateException("Rpc server has already shutdown");
         }
+        internalShutdown();
+        // 关闭和服务注册中心的连接
+        if (asyncServiceRegistrationThread.isAlive()) {
+            try {
+                asyncServiceRegistrationThread.join();
+            }
+            catch (InterruptedException e) {
+                LOG.warn("asyncServiceRegistrationThread has been interrupted", e);
+            }
+        }
+        asyncServiceRegistrationThread = null;
+        asyncServiceRegistrationQueue.clear();
+        serviceDescriptorContainer.clear();
     }
 
     @Override
     public boolean isRunning() {
-        return false;
+        return running.get();
     }
 
     protected abstract void internalShutdown();
@@ -70,23 +99,23 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
     //--------------------------------ServiceRegistrar
 
     @Override
-    public <E> Optional<ServiceProxy> regist(E rpcService) {
+    public <E> Optional<ServiceDescriptor> regist(E rpcService) {
         if (Objects.isNull(rpcService)) {
             throw new NullPointerException("rpcService");
         }
-        Optional<ServiceProxy> serviceProxy = serviceProxyContainer.regist(rpcService);
-        serviceProxy.ifPresent(this::registToServiceRegistrationIfNecessary);
-        return serviceProxy;
+        Optional<ServiceDescriptor> serviceDescriptor = serviceDescriptorContainer.regist(rpcService);
+        serviceDescriptor.ifPresent(this::registToServiceRegistrationIfNecessary);
+        return serviceDescriptor;
     }
 
-    private void registToServiceRegistrationIfNecessary(ServiceProxy serviceProxy) {
+    private void registToServiceRegistrationIfNecessary(ServiceDescriptor serviceDescriptor) {
         if (isRunning()) {
-            multiRegistToServiceRegistrationIfNecessary(List.of(serviceProxy));
+            multiRegistToServiceRegistrationIfNecessary(List.of(serviceDescriptor));
         }
     }
 
     @Override
-    public <E> Optional<ServiceProxy> regist(Class<? super E> interfaceClass, E rpcService) {
+    public <E> Optional<ServiceDescriptor> regist(Class<? super E> interfaceClass, E rpcService) {
         if (Objects.isNull(interfaceClass)) {
             return regist(rpcService);
         }
@@ -94,58 +123,86 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
             throw new NullPointerException("rpcService");
         }
         else {
-            Optional<ServiceProxy> serviceProxy = serviceProxyContainer.regist(interfaceClass, rpcService);
-            serviceProxy.ifPresent(this::registToServiceRegistrationIfNecessary);
-            return serviceProxy;
+            Optional<ServiceDescriptor> serviceDescriptor = serviceDescriptorContainer.regist(interfaceClass, rpcService);
+            serviceDescriptor.ifPresent(this::registToServiceRegistrationIfNecessary);
+            return serviceDescriptor;
         }
     }
 
     @Override
-    public <E> List<ServiceProxy> registAll(Collection<?> rpcServices) {
+    public <E> List<ServiceDescriptor> registAll(Collection<?> rpcServices) {
         if (Objects.isNull(rpcServices)) {
             throw new NullPointerException("rpcServices");
         }
-        List<ServiceProxy> serviceProxies;
+        List<ServiceDescriptor> serviceDescriptors;
         if (rpcServices.isEmpty()) {
-            serviceProxies = List.of();
+            serviceDescriptors = List.of();
             LOG.warn("Empty rpcServiecs and do nothing");
         }
         else {
-            serviceProxies = serviceProxyContainer.<E>registAll(rpcServices);
-            multiRegistToServiceRegistrationIfNecessary(serviceProxies);
+            serviceDescriptors = serviceDescriptorContainer.<E>registAll(rpcServices);
+            multiRegistToServiceRegistrationIfNecessary(serviceDescriptors);
         }
-        return serviceProxies;
+        return serviceDescriptors;
     }
 
-    private void multiRegistToServiceRegistrationIfNecessary(List<ServiceProxy> serviceProxies) {
-        if (isRunning() && !serviceProxies.isEmpty()) {
-            Partition<ServiceProxy> serviceProxyPartition = new Partition<>(serviceProxies);
+    private void multiRegistToServiceRegistrationIfNecessary(List<ServiceDescriptor> serviceDescriptors) {
+        if (isRunning() && !serviceDescriptors.isEmpty()) {
+            Partition<ServiceDescriptor> serviceProxyPartition = new Partition<>(serviceDescriptors);
             while (serviceProxyPartition.hasNext()) {
-                List<ServiceProxy> sub = serviceProxyPartition.next();
-
-                // todo 将服务注册到服务注册中心上去
+                List<ServiceDescriptor> sub = serviceProxyPartition.next();
+                asyncServiceRegistrationQueue.add(sub);
             }
 
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Regist service: {} to service registration", serviceProxies);
+                LOG.debug("Regist service: {} to service registration", serviceDescriptors);
             }
         }
     }
 
     @Override
-    public <E> List<ServiceProxy> registAll(Map<Class<?>, ?> rpcServices) {
+    public <E> List<ServiceDescriptor> registAll(Map<Class<?>, ?> rpcServices) {
         if (Objects.isNull(rpcServices)) {
             throw new NullPointerException("rpcServices");
         }
-        List<ServiceProxy> serviceProxies;
+        List<ServiceDescriptor> serviceDescriptors;
         if (rpcServices.isEmpty()) {
-            serviceProxies = Collections.emptyList();
+            serviceDescriptors = Collections.emptyList();
             LOG.warn("Empty rpcServiecs and do nothing");
         }
         else {
-            serviceProxies = serviceProxyContainer.<E>registAll(rpcServices);
-            multiRegistToServiceRegistrationIfNecessary(serviceProxies);
+            serviceDescriptors = serviceDescriptorContainer.<E>registAll(rpcServices);
+            multiRegistToServiceRegistrationIfNecessary(serviceDescriptors);
         }
-        return serviceProxies;
+        return serviceDescriptors;
+    }
+
+    private class AsyncServiceRegistrationThread extends QrpcThread {
+
+        private AsyncServiceRegistrationThread() {
+            super("asyncServiceRegistration");
+        }
+
+        @Override
+        public void run() {
+            while (isRunning()) {
+                List<ServiceDescriptor> serviceDescriptors;
+                try {
+                    serviceDescriptors = asyncServiceRegistrationQueue.take();
+                }
+                catch (InterruptedException e) {
+                    // ignore and log message
+                    LOG.warn("Blocking queue[asyncServiceRegistrationQueue] " +
+                            "has been interrupted while waiting for an serviceDescriptor list", e);
+                    continue;
+                }
+                if (serviceDescriptors.size() == 1) {
+                    // 执行单个服务实例注册
+                }
+                else {
+                    // 执行多实例注册
+                }
+            }
+        }
     }
 }

@@ -10,12 +10,13 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * @author qiuyj
  * @since 2020-02-29
  */
-public class ServiceProxy {
+public class ServiceDescriptor {
 
     private final Object proxyObject;
 
@@ -28,9 +29,20 @@ public class ServiceProxy {
      */
     private Map<String, RpcMethodInfo> rpcMethods = new HashMap<>();
 
-    public ServiceProxy(Class<?> interfaceClass, Object rpcService) {
+    public ServiceDescriptor(Class<?> interfaceClass, Object rpcService) {
         this.interfaceClass = parseInterface(interfaceClass);
         this.proxyObject = parseMethodInfo(rpcService);
+    }
+
+    /**
+     * 根据方法签名得到对应的方法信息
+     * @param methodName 方法名
+     * @param parameterTypes 方法参数类型
+     * @return 对应的方法信息
+     */
+    public Optional<RpcMethodInfo> getMethodInfo(String methodName, Class<?>... parameterTypes) {
+        String methodSig = RpcRuntimeUtils.getMethodSig(methodName, parameterTypes);
+        return Optional.ofNullable(rpcMethods.get(methodSig));
     }
 
     private Object parseMethodInfo(Object rpcService) {

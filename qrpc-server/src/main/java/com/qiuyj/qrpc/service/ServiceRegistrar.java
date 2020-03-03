@@ -13,11 +13,11 @@ import java.util.Optional;
 @SuppressWarnings("unused")
 public interface ServiceRegistrar {
 
-    <E> Optional<ServiceProxy> regist(E rpcService);
+    <E> Optional<ServiceDescriptor> regist(E rpcService);
 
-    <E> Optional<ServiceProxy> regist(Class<? super E> interfaceClass, E rpcService);
+    <E> Optional<ServiceDescriptor> regist(Class<? super E> interfaceClass, E rpcService);
 
-    <E> List<ServiceProxy> registAll(Collection<?> rpcServices);
+    <E> List<ServiceDescriptor> registAll(Collection<?> rpcServices);
 
-    <E> List<ServiceProxy> registAll(Map<Class<?>, ?> rpcServices);
+    <E> List<ServiceDescriptor> registAll(Map<Class<?>, ?> rpcServices);
 }
