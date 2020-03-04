@@ -38,7 +38,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
      */
     private final AtomicBoolean running = new AtomicBoolean();
 
-    private Thread asyncServiceRegistrationThread;
+    private Thread asyncServiceRegistrationUnregistrationThread;
 
     protected RpcServer(RpcServerConfig config, ServiceDescriptorContainer serviceDescriptorContainer) {
         this.config = config;
@@ -65,8 +65,8 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
         if (config.isEnableServiceRegistration()) {
             // 2、将所有注册的服务暴露到服务注册中心（如果支持服务注册中心）
             // 3、启动异步线程，注册运行期间注册的服务
-            asyncServiceRegistrationThread = new AsyncServiceRegistrationThread();
-            asyncServiceRegistrationThread.start();
+            asyncServiceRegistrationUnregistrationThread = new AsyncServiceRegistrationUnregistrationThread();
+            asyncServiceRegistrationUnregistrationThread.start();
         }
         // 4、启动socket服务器
         internalStart(config);
@@ -82,15 +82,15 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
         internalShutdown();
         if (config.isEnableServiceRegistration()) {
             // 关闭和服务注册中心的连接
-            if (asyncServiceRegistrationThread.isAlive()) {
+            if (asyncServiceRegistrationUnregistrationThread.isAlive()) {
                 try {
-                    asyncServiceRegistrationThread.join();
+                    asyncServiceRegistrationUnregistrationThread.join();
                 }
                 catch (InterruptedException e) {
                     LOG.warn("asyncServiceRegistrationThread has been interrupted", e);
                 }
             }
-            asyncServiceRegistrationThread = null;
+            asyncServiceRegistrationUnregistrationThread = null;
             asyncServiceRegistrationUnregistrationQueue.clear();
         }
         serviceDescriptorContainer.clear();
@@ -228,9 +228,9 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
         return unregistAll(serviceDescriptors, true);
     }
 
-    private class AsyncServiceRegistrationThread extends QrpcThread {
+    private class AsyncServiceRegistrationUnregistrationThread extends QrpcThread {
 
-        private AsyncServiceRegistrationThread() {
+        private AsyncServiceRegistrationUnregistrationThread() {
             super("ASRU");
         }
 
