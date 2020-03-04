@@ -7,5 +7,7 @@ module qrpc.server {
     requires static io.netty.all;
 
     exports com.qiuyj.qrpc.server;
+    exports com.qiuyj.qrpc.server.netty to qrpc.spring;
+    exports com.qiuyj.qrpc.server.nio to qrpc.spring;
     exports com.qiuyj.qrpc.service to qrpc.spring;
 }

@@ -37,7 +37,7 @@ public abstract class RpcServerFactory {
         // 3、创建对应的服务器
         RpcServer rpcServer = newInstance(serverConfig, sdContainer);
         // 4、配置rpcServer
-        rpcServer.configure();
+        rpcServer.configure(serverConfig);
         return rpcServer;
     }
 

@@ -1,6 +1,7 @@
 package com.qiuyj.qrpc.server;
 
 import com.qiuyj.qrpc.QrpcThread;
+import com.qiuyj.qrpc.cnxn.RpcConnection;
 import com.qiuyj.qrpc.logger.InternalLogger;
 import com.qiuyj.qrpc.logger.InternalLoggerFactory;
 import com.qiuyj.qrpc.service.ServiceDescriptor;
@@ -10,6 +11,7 @@ import com.qiuyj.qrpc.utils.Partition;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -40,6 +42,11 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
 
     private Thread asyncServiceRegistrationUnregistrationThread;
 
+    /**
+     * 当前rpc服务器所持有的所有的连接
+     */
+    private List<RpcConnection> connections = new LinkedList<>();
+
     protected RpcServer(RpcServerConfig config, ServiceDescriptorContainer serviceDescriptorContainer) {
         this.config = config;
         this.serviceDescriptorContainer = serviceDescriptorContainer;
@@ -49,8 +56,8 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
         }
     }
 
-    public void configure() {
-
+    public void configure(RpcServerConfig serverConfig) {
+        // do nothing
     }
 
     //--------------------------------Lifecycle
