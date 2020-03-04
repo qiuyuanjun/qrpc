@@ -54,8 +54,4 @@ public abstract class RpcServerFactory {
         }
     }
 
-    public static void main(String[] args) {
-        createDefault();
-    }
-
 }
