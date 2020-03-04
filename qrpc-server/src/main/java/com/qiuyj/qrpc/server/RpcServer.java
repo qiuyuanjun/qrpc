@@ -231,7 +231,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
     private class AsyncServiceRegistrationThread extends QrpcThread {
 
         private AsyncServiceRegistrationThread() {
-            super("asyncServiceRegistration");
+            super("ASRU");
         }
 
         @Override
