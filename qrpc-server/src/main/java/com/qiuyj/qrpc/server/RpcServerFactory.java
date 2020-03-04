@@ -29,8 +29,8 @@ public abstract class RpcServerFactory {
     public static RpcServer createDefault() {
         // 1、创建RpcServerConfig对象
         RpcServerConfig serverConfig = RpcServerConfig.createDefault();
-        if (LOG.isDebugEnabled()) {
-            LOG.debug(serverConfig.toString());
+        if (LOG.isInfoEnabled()) {
+            LOG.info(serverConfig.toString());
         }
         // 2、创建ServiceDescriptorContainer对象
         ServiceDescriptorContainer sdContainer = new DefaultServiceDescriptorContainer(serverConfig.isIgnoreTypeMismatch());
@@ -52,6 +52,10 @@ public abstract class RpcServerFactory {
         catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
             throw new IllegalStateException("Error instantiating constructor", e);
         }
+    }
+
+    public static void main(String[] args) {
+        createDefault();
     }
 
 }

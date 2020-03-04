@@ -101,9 +101,11 @@ public class RpcServerConfig {
 
     @Override
     public String toString() {
-        return "RpcServerConfig{" +
-                "\nignoreTypeMismatch=" + ignoreTypeMismatch +
-                ",\nrpcServerClassName='" + rpcServerClassName + "'" +
+        return "\nRpcServerConfig {" +
+                "\n ignoreTypeMismatch=" + ignoreTypeMismatch +
+                ",\n rpcServerClassName='" + rpcServerClassName + '\'' +
+                ",\n asyncServiceRegistrationUnregistrationQueueSize=" + asyncServiceRegistrationUnregistrationQueueSize +
+                ",\n enableServiceRegistration=" + enableServiceRegistration +
                 "\n}";
     }
 }
