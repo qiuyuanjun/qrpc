@@ -87,7 +87,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
                     asyncServiceRegistrationUnregistrationThread.join();
                 }
                 catch (InterruptedException e) {
-                    LOG.warn("asyncServiceRegistrationThread has been interrupted", e);
+                    LOG.warn("asyncServiceRegistrationUnregistrationThread has been interrupted", e);
                 }
             }
             asyncServiceRegistrationUnregistrationThread = null;
@@ -159,7 +159,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
                 if (!asyncServiceRegistrationUnregistrationQueue.offer(new RegistrationUnregistrationInfo(sub, true))) {
                     // 此时，注册队列已经满了，那么注册失败，移除之前注册的所有服务
                     unregistAll(serviceDescriptors, false);
-                    throw new IllegalStateException("asyncServiceRegistrationQueue has been fulled");
+                    throw new IllegalStateException("asyncServiceRegistrationUnregistrationQueue has been fulled");
                 }
 //                try {
 //                    asyncServiceRegistrationQueue.put(sub);
@@ -209,7 +209,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
             while (serviceProxyPartition.hasNext()) {
                 List<ServiceDescriptor> sub = serviceProxyPartition.next();
                 if (!asyncServiceRegistrationUnregistrationQueue.offer(new RegistrationUnregistrationInfo(sub, false))) {
-                    throw new IllegalStateException("asyncServiceRegistrationQueue has been fulled");
+                    throw new IllegalStateException("asyncServiceRegistrationUnregistrationQueue has been fulled");
                 }
             }
         }
@@ -237,18 +237,18 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
         @Override
         public void run() {
             while (isRunning()) {
-                RegistrationUnregistrationInfo item;
+                RegistrationUnregistrationInfo info;
                 try {
-                    item = asyncServiceRegistrationUnregistrationQueue.take();
+                    info = asyncServiceRegistrationUnregistrationQueue.take();
                 }
                 catch (InterruptedException e) {
                     // ignore and log message
-                    LOG.warn("Blocking queue[asyncServiceRegistrationQueue] " +
+                    LOG.warn("Blocking queue[asyncServiceRegistrationUnregistrationQueue] " +
                             "has been interrupted while waiting for an serviceDescriptor list", e);
                     continue;
                 }
-                List<ServiceDescriptor> serviceDescriptors = item.serviceDescriptors;
-                if (item.regist) {
+                List<ServiceDescriptor> serviceDescriptors = info.serviceDescriptors;
+                if (info.regist) {
                     // 注册服务
 
                 }
