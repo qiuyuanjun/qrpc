@@ -18,6 +18,7 @@ import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -47,6 +48,12 @@ public class NioRpcServer extends RpcServer {
 
     @Override
     protected void internalStart(RpcServerConfig config) {
+        // 如果启动rpcServer的时候，ss为null
+        // 表明当前rpcServer没有调用configure方法，那么就需要手动调用
+        if (Objects.isNull(ss)) {
+            configure(config);
+        }
+
         try {
             ss.bind(new InetSocketAddress(config.getPort()));
         }
@@ -127,12 +134,11 @@ public class NioRpcServer extends RpcServer {
 
         private List<SelectThread> selectThreads;
 
-        private Iterator<SelectThread> selectThreadIterator;
+        private int selectThreadCursor = -1;
 
         private AcceptThread(List<SelectThread> selectThreads) {
             super("NIO-Accept");
             this.selectThreads = selectThreads;
-            this.selectThreadIterator = selectThreads.iterator();
 
             // 将当前AcceptThread的Selector注册到ServerSocketChannel上，并接受ACCEPT事件
             try {
@@ -177,10 +183,11 @@ public class NioRpcServer extends RpcServer {
         }
 
         private SelectThread roundRobinGetSelectThread() {
-            if (!selectThreadIterator.hasNext()) {
-                selectThreadIterator = selectThreads.iterator();
+            int i = ++selectThreadCursor;
+            if (i >= selectThreads.size()) {
+                i = selectThreadCursor = 0;
             }
-            return selectThreadIterator.next();
+            return selectThreads.get(i);
         }
     }
 
