@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * @author qiuyj
@@ -137,7 +138,10 @@ public abstract class AbstractServiceRegistrar implements ServiceRegistrar {
 
     @Override
     public boolean unregistAll(List<ServiceDescriptor> serviceDescriptors) {
-        serviceDescriptors.forEach(sd -> doUnregist(sd.getInterface()));
+        List<Class<?>> keys = serviceDescriptors.stream()
+                .map(ServiceDescriptor::getInterface)
+                .collect(Collectors.toList());
+        doUnregistAll(keys);
         return true;
     }
 
@@ -146,4 +150,6 @@ public abstract class AbstractServiceRegistrar implements ServiceRegistrar {
      * @param interfaceClass rpc接口
      */
     protected abstract void doUnregist(Class<?> interfaceClass);
+
+    protected abstract void doUnregistAll(List<Class<?>> interfaceClasses);
 }
