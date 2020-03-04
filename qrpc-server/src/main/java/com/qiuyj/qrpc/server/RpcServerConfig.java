@@ -24,7 +24,9 @@ public class RpcServerConfig {
 
     private String rpcServerClassName = DEFAULT_RPC_SERVER_CLASS_NAME;
 
-    private int asyncServiceRegistrationQueueSize = 50;
+    private int asyncServiceRegistrationUnregistrationQueueSize = 50;
+
+    private boolean enableServiceRegistration = true;
 
     public RpcServerConfig(Properties properties) {
         this(new HashMap<>(properties));
@@ -39,8 +41,11 @@ public class RpcServerConfig {
             else if ("rpcServerClassName".equals(k)) {
                 rpcServerClassName = val;
             }
-            else if ("asyncServiceRegistrationQueueSize".equals(k)) {
-                asyncServiceRegistrationQueueSize = Integer.parseInt(val);
+            else if ("asyncServiceRegistrationUnregistrationQueueSize".equals(k)) {
+                asyncServiceRegistrationUnregistrationQueueSize = Integer.parseInt(val);
+            }
+            else if ("enableServiceRegistration".equals(k)) {
+                enableServiceRegistration = Boolean.parseBoolean(val);
             }
         });
     }
@@ -62,8 +67,12 @@ public class RpcServerConfig {
         return serverClass;
     }
 
-    public int getAsyncServiceRegistrationQueueSize() {
-        return asyncServiceRegistrationQueueSize;
+    public int getAsyncServiceRegistrationUnregistrationQueueSize() {
+        return asyncServiceRegistrationUnregistrationQueueSize;
+    }
+
+    public boolean isEnableServiceRegistration() {
+        return enableServiceRegistration;
     }
 
     static RpcServerConfig createDefault() {

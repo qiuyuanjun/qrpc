@@ -27,7 +27,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
 
     private static final InternalLogger LOG = InternalLoggerFactory.getLogger(RpcServer.class);
 
-    private BlockingQueue<List<ServiceDescriptor>> asyncServiceRegistrationQueue;
+    private BlockingQueue<RegistrationUnregistrationInfo> asyncServiceRegistrationUnregistrationQueue;
 
     private RpcServerConfig config;
 
@@ -43,7 +43,10 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
     protected RpcServer(RpcServerConfig config, ServiceDescriptorContainer serviceDescriptorContainer) {
         this.config = config;
         this.serviceDescriptorContainer = serviceDescriptorContainer;
-        asyncServiceRegistrationQueue = new LinkedBlockingQueue<>(config.getAsyncServiceRegistrationQueueSize());
+        if (config.isEnableServiceRegistration()) {
+            asyncServiceRegistrationUnregistrationQueue =
+                    new LinkedBlockingQueue<>(config.getAsyncServiceRegistrationUnregistrationQueueSize());
+        }
     }
 
     public void configure() {
@@ -59,10 +62,12 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
             throw new IllegalStateException("Rpc server has already start");
         }
         // 1、初始化所有的过滤器
-        // 2、将所有注册的服务暴露到服务注册中心（如果支持服务注册中心）
-        // 3、启动异步线程，注册运行期间注册的服务
-        asyncServiceRegistrationThread = new AsyncServiceRegistrationThread();
-        asyncServiceRegistrationThread.start();
+        if (config.isEnableServiceRegistration()) {
+            // 2、将所有注册的服务暴露到服务注册中心（如果支持服务注册中心）
+            // 3、启动异步线程，注册运行期间注册的服务
+            asyncServiceRegistrationThread = new AsyncServiceRegistrationThread();
+            asyncServiceRegistrationThread.start();
+        }
         // 4、启动socket服务器
         internalStart(config);
     }
@@ -75,17 +80,19 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
             throw new IllegalStateException("Rpc server has already shutdown");
         }
         internalShutdown();
-        // 关闭和服务注册中心的连接
-        if (asyncServiceRegistrationThread.isAlive()) {
-            try {
-                asyncServiceRegistrationThread.join();
+        if (config.isEnableServiceRegistration()) {
+            // 关闭和服务注册中心的连接
+            if (asyncServiceRegistrationThread.isAlive()) {
+                try {
+                    asyncServiceRegistrationThread.join();
+                }
+                catch (InterruptedException e) {
+                    LOG.warn("asyncServiceRegistrationThread has been interrupted", e);
+                }
             }
-            catch (InterruptedException e) {
-                LOG.warn("asyncServiceRegistrationThread has been interrupted", e);
-            }
+            asyncServiceRegistrationThread = null;
+            asyncServiceRegistrationUnregistrationQueue.clear();
         }
-        asyncServiceRegistrationThread = null;
-        asyncServiceRegistrationQueue.clear();
         serviceDescriptorContainer.clear();
     }
 
@@ -109,7 +116,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
     }
 
     private void registToServiceRegistrationIfNecessary(ServiceDescriptor serviceDescriptor) {
-        if (isRunning()) {
+        if (config.isEnableServiceRegistration() && isRunning()) {
             multiRegistToServiceRegistrationIfNecessary(List.of(serviceDescriptor));
         }
     }
@@ -145,13 +152,13 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
     }
 
     private void multiRegistToServiceRegistrationIfNecessary(List<ServiceDescriptor> serviceDescriptors) {
-        if (isRunning() && !serviceDescriptors.isEmpty()) {
+        if (config.isEnableServiceRegistration() && isRunning() && !serviceDescriptors.isEmpty()) {
             Partition<ServiceDescriptor> serviceProxyPartition = new Partition<>(serviceDescriptors);
             while (serviceProxyPartition.hasNext()) {
                 List<ServiceDescriptor> sub = serviceProxyPartition.next();
-                if (!asyncServiceRegistrationQueue.offer(sub)) {
+                if (!asyncServiceRegistrationUnregistrationQueue.offer(new RegistrationUnregistrationInfo(sub, true))) {
                     // 此时，注册队列已经满了，那么注册失败，移除之前注册的所有服务
-                    unregistAll(serviceDescriptors);
+                    unregistAll(serviceDescriptors, false);
                     throw new IllegalStateException("asyncServiceRegistrationQueue has been fulled");
                 }
 //                try {
@@ -186,13 +193,39 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
     @Override
     public boolean unregist(ServiceDescriptor serviceDescriptor) {
         Objects.requireNonNull(serviceDescriptor, "serviceDescriptor");
+        unregistFromServiceRegistrationIfNecessary(serviceDescriptor);
         return serviceDescriptorContainer.unregist(serviceDescriptor);
+    }
+
+    private void unregistFromServiceRegistrationIfNecessary(ServiceDescriptor serviceDescriptor) {
+        if (config.isEnableServiceRegistration()) {
+            multiUnregistFromServiceRegistrationIfNecessary(List.of(serviceDescriptor));
+        }
+    }
+
+    private void multiUnregistFromServiceRegistrationIfNecessary(List<ServiceDescriptor> serviceDescriptors) {
+        if (config.isEnableServiceRegistration() && !serviceDescriptors.isEmpty()) {
+            Partition<ServiceDescriptor> serviceProxyPartition = new Partition<>(serviceDescriptors);
+            while (serviceProxyPartition.hasNext()) {
+                List<ServiceDescriptor> sub = serviceProxyPartition.next();
+                if (!asyncServiceRegistrationUnregistrationQueue.offer(new RegistrationUnregistrationInfo(sub, false))) {
+                    throw new IllegalStateException("asyncServiceRegistrationQueue has been fulled");
+                }
+            }
+        }
+    }
+
+    private boolean unregistAll(List<ServiceDescriptor> serviceDescriptors, boolean unregistFromServiceRegistration) {
+        Objects.requireNonNull(serviceDescriptors, "serviceDescriptors");
+        if (unregistFromServiceRegistration) {
+            multiUnregistFromServiceRegistrationIfNecessary(serviceDescriptors);
+        }
+        return !serviceDescriptors.isEmpty() && serviceDescriptorContainer.unregistAll(serviceDescriptors);
     }
 
     @Override
     public boolean unregistAll(List<ServiceDescriptor> serviceDescriptors) {
-        Objects.requireNonNull(serviceDescriptors, "serviceDescriptors");
-        return !serviceDescriptors.isEmpty() && serviceDescriptorContainer.unregistAll(serviceDescriptors);
+        return unregistAll(serviceDescriptors, true);
     }
 
     private class AsyncServiceRegistrationThread extends QrpcThread {
@@ -204,9 +237,9 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
         @Override
         public void run() {
             while (isRunning()) {
-                List<ServiceDescriptor> serviceDescriptors;
+                RegistrationUnregistrationInfo item;
                 try {
-                    serviceDescriptors = asyncServiceRegistrationQueue.take();
+                    item = asyncServiceRegistrationUnregistrationQueue.take();
                 }
                 catch (InterruptedException e) {
                     // ignore and log message
@@ -214,13 +247,27 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
                             "has been interrupted while waiting for an serviceDescriptor list", e);
                     continue;
                 }
-                if (serviceDescriptors.size() == 1) {
-                    // 执行单个服务实例注册
+                List<ServiceDescriptor> serviceDescriptors = item.serviceDescriptors;
+                if (item.regist) {
+                    // 注册服务
+
                 }
                 else {
-                    // 执行多实例注册
+                    // 注销服务
                 }
             }
+        }
+    }
+
+    private static class RegistrationUnregistrationInfo {
+
+        private boolean regist;
+
+        private List<ServiceDescriptor> serviceDescriptors;
+
+        private RegistrationUnregistrationInfo(List<ServiceDescriptor> serviceDescriptors, boolean regist) {
+            this.serviceDescriptors = serviceDescriptors;
+            this.regist = regist;
         }
     }
 }
