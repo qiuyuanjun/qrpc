@@ -137,6 +137,12 @@ public abstract class AbstractServiceRegistrar implements ServiceRegistrar {
     protected abstract ServiceDescriptor doRegist(Class<?> interfaceClass, Object rpcService);
 
     @Override
+    public boolean unregist(ServiceDescriptor serviceDescriptor) {
+        doUnregist(serviceDescriptor.getInterface());
+        return true;
+    }
+
+    @Override
     public boolean unregistAll(List<ServiceDescriptor> serviceDescriptors) {
         List<Class<?>> keys = serviceDescriptors.stream()
                 .map(ServiceDescriptor::getInterface)

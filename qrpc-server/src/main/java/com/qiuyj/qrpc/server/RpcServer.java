@@ -184,8 +184,14 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
     }
 
     @Override
+    public boolean unregist(ServiceDescriptor serviceDescriptor) {
+        Objects.requireNonNull(serviceDescriptor, "serviceDescriptor");
+        return serviceDescriptorContainer.unregist(serviceDescriptor);
+    }
+
+    @Override
     public boolean unregistAll(List<ServiceDescriptor> serviceDescriptors) {
-        Objects.requireNonNull(serviceDescriptors, "serviceDescriptor");
+        Objects.requireNonNull(serviceDescriptors, "serviceDescriptors");
         return !serviceDescriptors.isEmpty() && serviceDescriptorContainer.unregistAll(serviceDescriptors);
     }
 
