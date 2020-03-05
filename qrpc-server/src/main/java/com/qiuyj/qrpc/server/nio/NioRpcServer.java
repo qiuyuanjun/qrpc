@@ -91,7 +91,6 @@ public class NioRpcServer extends RpcServer {
         try {
             ss = ServerSocketChannel.open();
             ss.configureBlocking(false); // 非阻塞
-            ss.setOption(StandardSocketOptions.TCP_NODELAY, true);
             ss.setOption(StandardSocketOptions.SO_REUSEADDR, true);
         }
         catch (IOException e) {
