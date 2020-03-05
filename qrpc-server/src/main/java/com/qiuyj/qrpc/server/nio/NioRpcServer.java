@@ -23,7 +23,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * 基于nio的rpc服务器的实现
+ * 基于nio的rpc服务器的实现，参考了zookeeper的ServerCnxnFactoryNio的实现
  * @author qiuyj
  * @since 2020-02-29
  */
@@ -79,10 +79,22 @@ public class NioRpcServer extends RpcServer {
         // 清理各种线程的资源
         if (acceptThread.isAlive()) {
             acceptThread.wakeupSelector();
+            try {
+                acceptThread.join();
+            }
+            catch (InterruptedException e) {
+                LOG.warn("AcceptThread has been interrupted", e);
+            }
         }
         for (SelectThread selectThread : selectThreads) {
             if (selectThread.isAlive()) {
                 selectThread.wakeupSelector();
+                try {
+                    selectThread.join();
+                }
+                catch (InterruptedException e) {
+                    LOG.warn("SelectThread: " + selectThread.getName() + " has been interrupted", e);
+                }
             }
         }
     }
@@ -99,8 +111,8 @@ public class NioRpcServer extends RpcServer {
         }
 
         int numCores = Runtime.getRuntime().availableProcessors();
-        int selectThreadNums = (int) Math.sqrt(numCores >> 1);
-        int workerNums = numCores << 1;
+        int selectThreadNums = (int) Math.sqrt(numCores >>> 1);
+//        int workerNums = numCores << 1;
         selectThreads = new ArrayList<>(selectThreadNums);
         for (int i = 0; i < selectThreadNums; i++) {
             selectThreads.set(i, new SelectThread(i));
@@ -114,6 +126,12 @@ public class NioRpcServer extends RpcServer {
 
         AbstractSelectorThread(String name) {
             super(name);
+        }
+
+        /**
+         * 初始化selector
+         */
+        void initSelector() {
             try {
                 selector = Selector.open();
             }
@@ -157,6 +175,8 @@ public class NioRpcServer extends RpcServer {
                 ss.register(selector, SelectionKey.OP_ACCEPT);
             }
             catch (ClosedChannelException e) {
+                closeSelector();
+
                 throw new IllegalStateException("Error registering selector on ServerSocketChannel. " +
                         "It is possible that ServerSocketChannel has been closed", e);
             }
@@ -164,46 +184,84 @@ public class NioRpcServer extends RpcServer {
 
         @Override
         public void run() {
+            initSelector();
             try {
                 while (isRunning() && ss.isOpen()) {
                     try {
-                        selector.select();
+                        acceptSocketChannel();
                     }
-                    catch (IOException e) {
-                        throw new IllegalStateException("The current Selector was interrupted while waiting for the ACCEPT event", e);
+                    catch (RuntimeException e) {
+                        LOG.warn("Ignoring runtime exception", e);
                     }
-                    processSelectedAcceptKeys(selector.selectedKeys());
+                    catch (Exception e) {
+                        LOG.warn("Ignoring exception", e);
+                    }
                 }
             }
             finally {
                 Set<SelectionKey> sks = selector.selectedKeys();
                 for (SelectionKey sk : sks) {
-                    if (sk.isValid()) {
-                        sk.cancel();
-                    }
+                    sk.cancel();
                 }
 
                 closeSelector();
             }
         }
 
+        private void acceptSocketChannel() throws IOException {
+            int n = selector.select();
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("The current selector has received {} ACCEPT event keys", n);
+            }
+
+            processSelectedAcceptKeys(selector.selectedKeys());
+        }
+
         private void processSelectedAcceptKeys(Set<SelectionKey> selectionKeys) {
             if (selectionKeys.isEmpty()) {
                 return;
             }
-            Iterator<SelectionKey> selectionKeyIterator = selectionKeys.iterator();
-            while (selectionKeyIterator.hasNext()) {
-                SelectionKey sk = selectionKeyIterator.next();
-                selectionKeyIterator.remove();
+            Iterator<SelectionKey> skIter = selectionKeys.iterator();
+            while (skIter.hasNext()) {
+                SelectionKey sk = skIter.next();
+                skIter.remove();
                 if (!sk.isValid()) { // 无效的selectionKey，直接忽略
                     continue;
                 }
-                if (sk.isAcceptable()) {
-                    SelectThread selectThread = roundRobinGetSelectThread();
-                    SocketChannel socketChannel = (SocketChannel) sk.channel();
-                    selectThread.acceptSocketChannel(socketChannel);
+                if (sk.isAcceptable() && !doAccept()) {
+                    pauseAccept();
+                }
+                else {
+                    LOG.warn("The current SelectionKey: {} is not ACCEPT ops", sk);
                 }
             }
+        }
+
+        private void pauseAccept() {
+
+        }
+
+        private boolean doAccept() {
+            boolean accept = false;
+            SocketChannel sc = null;
+            try {
+                sc = ss.accept();
+                sc.configureBlocking(false);
+                roundRobinGetSelectThread().acceptSocketChannel(sc);
+                accept = true;
+            }
+            catch (IOException e) {
+                LOG.warn("Error accepting socket channel", e);
+                if (Objects.nonNull(sc)) {
+                    try {
+                        sc.close();
+                    }
+                    catch (IOException ex) {
+                        LOG.warn("Error closing socket channel", ex);
+                    }
+                }
+            }
+            return accept;
         }
 
         private SelectThread roundRobinGetSelectThread() {
@@ -223,6 +281,7 @@ public class NioRpcServer extends RpcServer {
 
         @Override
         public void run() {
+            initSelector();
             while (isRunning() && ss.isOpen()) {
 
             }
