@@ -16,6 +16,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -107,11 +108,11 @@ public class NioRpcServer extends RpcServer {
         acceptThread = new AcceptThread(selectThreads);
     }
 
-    private static abstract class AbstractSelectorThread extends QrpcThread {
+    private abstract static class AbstractSelectorThread extends QrpcThread {
 
-        protected Selector selector;
+        Selector selector;
 
-        protected AbstractSelectorThread(String name) {
+        AbstractSelectorThread(String name) {
             super(name);
             try {
                 selector = Selector.open();
@@ -127,6 +128,18 @@ public class NioRpcServer extends RpcServer {
         void wakeupSelector() {
             selector.wakeup();
         }
+
+        /**
+         * 关闭当前Selector
+         */
+        void closeSelector() {
+            try {
+                selector.close();
+            }
+            catch (IOException e) {
+                LOG.warn("Error closing selector", e);
+            }
+        }
     }
 
     private class AcceptThread extends AbstractSelectorThread {
@@ -137,7 +150,7 @@ public class NioRpcServer extends RpcServer {
 
         private AcceptThread(List<SelectThread> selectThreads) {
             super("NIO-Accept");
-            this.selectThreads = selectThreads;
+            this.selectThreads = Collections.unmodifiableList(selectThreads);
 
             // 将当前AcceptThread的Selector注册到ServerSocketChannel上，并接受ACCEPT事件
             try {
@@ -151,14 +164,26 @@ public class NioRpcServer extends RpcServer {
 
         @Override
         public void run() {
-            while (isRunning() && ss.isOpen()) {
-                try {
-                    selector.select();
+            try {
+                while (isRunning() && ss.isOpen()) {
+                    try {
+                        selector.select();
+                    }
+                    catch (IOException e) {
+                        throw new IllegalStateException("The current Selector was interrupted while waiting for the ACCEPT event", e);
+                    }
+                    processSelectedAcceptKeys(selector.selectedKeys());
                 }
-                catch (IOException e) {
-                    throw new IllegalStateException("The current Selector was interrupted while waiting for the ACCEPT event", e);
+            }
+            finally {
+                Set<SelectionKey> sks = selector.selectedKeys();
+                for (SelectionKey sk : sks) {
+                    if (sk.isValid()) {
+                        sk.cancel();
+                    }
                 }
-                processSelectedAcceptKeys(selector.selectedKeys());
+
+                closeSelector();
             }
         }
 
