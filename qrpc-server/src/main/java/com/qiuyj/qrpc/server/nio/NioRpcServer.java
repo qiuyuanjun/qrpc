@@ -6,6 +6,7 @@ import com.qiuyj.qrpc.logger.InternalLoggerFactory;
 import com.qiuyj.qrpc.server.RpcServer;
 import com.qiuyj.qrpc.server.RpcServerConfig;
 import com.qiuyj.qrpc.service.ServiceDescriptorContainer;
+import com.qiuyj.qrpc.utils.NioUtils;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -69,12 +70,7 @@ public class NioRpcServer extends RpcServer {
 
     @Override
     protected void internalShutdown() {
-        try {
-            ss.close();
-        }
-        catch (IOException e) {
-            LOG.warn("Error closing server socket channel, but ignore this error", e);
-        }
+        NioUtils.closeServerSocketChannelQuietly(ss);
 
         // 清理各种线程的资源
         if (acceptThread.isAlive()) {
@@ -151,12 +147,11 @@ public class NioRpcServer extends RpcServer {
          * 关闭当前Selector
          */
         void closeSelector() {
-            try {
-                selector.close();
-            }
-            catch (IOException e) {
-                LOG.warn("Error closing selector", e);
-            }
+            NioUtils.closeSelectorQuietly(selector);
+        }
+
+        void cancelSelectionKeys() {
+            selector.selectedKeys().forEach(SelectionKey::cancel);
         }
     }
 
@@ -166,13 +161,15 @@ public class NioRpcServer extends RpcServer {
 
         private int selectThreadCursor = -1;
 
+        private SelectionKey acceptSk;
+
         private AcceptThread(List<SelectThread> selectThreads) {
             super("NIO-Accept");
             this.selectThreads = Collections.unmodifiableList(selectThreads);
 
             // 将当前AcceptThread的Selector注册到ServerSocketChannel上，并接受ACCEPT事件
             try {
-                ss.register(selector, SelectionKey.OP_ACCEPT);
+                this.acceptSk = ss.register(selector, SelectionKey.OP_ACCEPT);
             }
             catch (ClosedChannelException e) {
                 closeSelector();
@@ -185,27 +182,19 @@ public class NioRpcServer extends RpcServer {
         @Override
         public void run() {
             initSelector();
-            try {
-                while (isRunning() && ss.isOpen()) {
-                    try {
-                        acceptSocketChannel();
-                    }
-                    catch (RuntimeException e) {
-                        LOG.warn("Ignoring runtime exception", e);
-                    }
-                    catch (Exception e) {
-                        LOG.warn("Ignoring exception", e);
-                    }
+            while (isRunning() && ss.isOpen()) {
+                try {
+                    acceptSocketChannel();
+                }
+                catch (RuntimeException e) {
+                    LOG.warn("Ignore runtime exception", e);
+                }
+                catch (Exception e) {
+                    LOG.warn("Ignore exception", e);
                 }
             }
-            finally {
-                Set<SelectionKey> sks = selector.selectedKeys();
-                for (SelectionKey sk : sks) {
-                    sk.cancel();
-                }
-
-                closeSelector();
-            }
+            cancelSelectionKeys();
+            closeSelector();
         }
 
         private void acceptSocketChannel() throws IOException {
@@ -238,7 +227,15 @@ public class NioRpcServer extends RpcServer {
         }
 
         private void pauseAccept() {
-
+            // interestOps设置为0，表示对任何事件都不感兴趣
+            acceptSk.interestOps(0);
+            try {
+                selector.select(10); // 等待10毫秒
+            }
+            catch (IOException e) {
+                LOG.warn("Ignore the exception that wait and then select the selection key set", e);
+            }
+            acceptSk.interestOps(SelectionKey.OP_ACCEPT);
         }
 
         private boolean doAccept() {
@@ -251,15 +248,8 @@ public class NioRpcServer extends RpcServer {
                 accept = true;
             }
             catch (IOException e) {
-                LOG.warn("Error accepting socket channel", e);
-                if (Objects.nonNull(sc)) {
-                    try {
-                        sc.close();
-                    }
-                    catch (IOException ex) {
-                        LOG.warn("Error closing socket channel", ex);
-                    }
-                }
+                LOG.warn("Ignore the exception that failed to accept socket channel", e);
+                NioUtils.closeSocketChannelQuietly(sc);
             }
             return accept;
         }
@@ -287,7 +277,7 @@ public class NioRpcServer extends RpcServer {
             }
         }
 
-        void acceptSocketChannel(SocketChannel socketChannel) {
+        void acceptSocketChannel(SocketChannel sc) {
 
         }
     }
