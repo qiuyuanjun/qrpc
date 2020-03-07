@@ -6,4 +6,5 @@ package com.qiuyj.qrpc.cnxn;
  * @since 2020-03-05
  */
 public interface RpcConnection {
+
 }

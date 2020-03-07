@@ -1,6 +1,7 @@
 package com.qiuyj.qrpc.server.nio;
 
 import com.qiuyj.qrpc.QrpcThread;
+import com.qiuyj.qrpc.cnxn.RpcConnection;
 import com.qiuyj.qrpc.logger.InternalLogger;
 import com.qiuyj.qrpc.logger.InternalLoggerFactory;
 import com.qiuyj.qrpc.server.RpcServer;
@@ -21,7 +22,13 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 基于nio的rpc服务器的实现，参考了zookeeper的ServerCnxnFactoryNio的实现
@@ -43,6 +50,8 @@ public class NioRpcServer extends RpcServer {
     private List<SelectThread> selectThreads;
 
     private ServerSocketChannel ss;
+
+    private ExecutorService workerPool;
 
     public NioRpcServer(RpcServerConfig config, ServiceDescriptorContainer serviceDescriptorContainer) {
         super(config, serviceDescriptorContainer);
@@ -108,12 +117,13 @@ public class NioRpcServer extends RpcServer {
 
         int numCores = Runtime.getRuntime().availableProcessors();
         int selectThreadNums = (int) Math.sqrt(numCores >>> 1);
-//        int workerNums = numCores << 1;
+        int workerNums = numCores << 1;
         selectThreads = new ArrayList<>(selectThreadNums);
         for (int i = 0; i < selectThreadNums; i++) {
             selectThreads.set(i, new SelectThread(i));
         }
         acceptThread = new AcceptThread(selectThreads);
+        workerPool = new ThreadPoolExecutor(workerNums, workerNums, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(workerNums));
     }
 
     private abstract static class AbstractSelectorThread extends QrpcThread {
@@ -127,7 +137,7 @@ public class NioRpcServer extends RpcServer {
         /**
          * 初始化selector
          */
-        void initSelector() {
+        private void initSelector() {
             try {
                 selector = Selector.open();
             }
@@ -150,9 +160,25 @@ public class NioRpcServer extends RpcServer {
             NioUtils.closeSelectorQuietly(selector);
         }
 
-        void cancelSelectionKeys() {
+        private void cancelSelectionKeys() {
             selector.selectedKeys().forEach(SelectionKey::cancel);
         }
+
+        @Override
+        public void run() {
+            // 初始化selector
+            initSelector();
+            try {
+                mainLoop();
+            }
+            finally {
+                // 退出了循环，那么不管是正常退出，还是循环内抛出了异常，那么均需要执行清理资源的方法
+                cancelSelectionKeys();
+                closeSelector();
+            }
+        }
+
+        protected abstract void mainLoop();
     }
 
     private class AcceptThread extends AbstractSelectorThread {
@@ -180,8 +206,7 @@ public class NioRpcServer extends RpcServer {
         }
 
         @Override
-        public void run() {
-            initSelector();
+        protected void mainLoop() {
             while (isRunning() && ss.isOpen()) {
                 try {
                     acceptSocketChannel();
@@ -193,8 +218,6 @@ public class NioRpcServer extends RpcServer {
                     LOG.warn("Ignore exception", e);
                 }
             }
-            cancelSelectionKeys();
-            closeSelector();
         }
 
         private void acceptSocketChannel() throws IOException {
@@ -244,7 +267,11 @@ public class NioRpcServer extends RpcServer {
             try {
                 sc = ss.accept();
                 sc.configureBlocking(false);
-                roundRobinGetSelectThread().acceptSocketChannel(sc);
+                SelectThread st = roundRobinGetSelectThread();
+                if (!st.acceptSocketChannel(sc)) {
+                    // 表明rpc服务器已经关闭了，那么抛出异常
+                    throw new IOException("Accept socket channel to select thread: " + st.getName() + " failed");
+                }
                 accept = true;
             }
             catch (IOException e) {
@@ -263,22 +290,75 @@ public class NioRpcServer extends RpcServer {
         }
     }
 
-    private class SelectThread extends AbstractSelectorThread {
+    class SelectThread extends AbstractSelectorThread {
+
+        private Queue<SocketChannel> acceptSocketChannelQueue = new ConcurrentLinkedQueue<>();
 
         private SelectThread(int i) {
             super("NIO-Select-" + i);
         }
 
         @Override
-        public void run() {
-            initSelector();
+        protected void mainLoop() {
             while (isRunning() && ss.isOpen()) {
-
+                try {
+                    select();
+                    processAcceptSocketChannel();
+                }
+                catch (RuntimeException e) {
+                    LOG.warn("Ignore runtime exception", e);
+                }
+                catch (Exception e) {
+                    LOG.warn("Ignore exception", e);
+                }
             }
         }
 
-        void acceptSocketChannel(SocketChannel sc) {
+        private void select() throws IOException {
+            int n = selector.select();
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("The current selector has received {} READ and WRITE event keys", n);
+            }
 
+            Iterator<SelectionKey> skIter = selector.selectedKeys().iterator();
+            while (skIter.hasNext()) {
+                SelectionKey sk = skIter.next();
+                skIter.remove();
+                if (sk.isReadable() || sk.isWritable()) {
+                    // 处理io操作
+                    doIO(sk);
+                }
+            }
+        }
+
+        private void doIO(SelectionKey sk) {
+            // 将io处理任务提交到worker线程
+            workerPool.execute(() -> {
+                RpcConnection rc = (RpcConnection) sk.attachment();
+                if (!(rc instanceof NioRpcConnection)) {
+                    throw new IllegalStateException("Not an NioRpcConnection: " + rc);
+                }
+                NioRpcConnection conn = ((NioRpcConnection) rc);
+                conn.doIO(SelectThread.this);
+            });
+        }
+
+        private void processAcceptSocketChannel() throws ClosedChannelException {
+            SocketChannel sc;
+            while (isRunning() && Objects.nonNull(sc = acceptSocketChannelQueue.poll())) {
+                SelectionKey sk = sc.register(selector, SelectionKey.OP_READ);
+                RpcConnection conn = new NioRpcConnection(sk);
+                sk.attach(conn);
+            }
+        }
+
+        boolean acceptSocketChannel(SocketChannel sc) {
+            boolean accept = true;
+            if (!isRunning() || !acceptSocketChannelQueue.offer(sc)) {
+                accept = false;
+            }
+            wakeupSelector();
+            return accept;
         }
     }
 }
