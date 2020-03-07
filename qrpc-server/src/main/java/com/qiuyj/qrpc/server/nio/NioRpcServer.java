@@ -27,11 +27,13 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 基于nio的rpc服务器的实现，参考了zookeeper的ServerCnxnFactoryNio的实现
+ * 基于nio的rpc服务器的实现，参考了zookeeper的NioServerCnxnFactory的实现
  * @author qiuyj
  * @since 2020-02-29
  */
@@ -45,12 +47,15 @@ public class NioRpcServer extends RpcServer {
     private AcceptThread acceptThread;
 
     /**
-     * 专门用于处理read或者write事件的线程
+     * 专门用于处理read或者write事件的线程（Math.sqrt(coreNums / 2)）
      */
     private List<SelectThread> selectThreads;
 
     private ServerSocketChannel ss;
 
+    /**
+     * 专门用于处理IO操作的线程池（coreNums * 2）
+     */
     private ExecutorService workerPool;
 
     public NioRpcServer(RpcServerConfig config, ServiceDescriptorContainer serviceDescriptorContainer) {
@@ -75,6 +80,10 @@ public class NioRpcServer extends RpcServer {
         // 启动各种线程
         acceptThread.start();
         selectThreads.forEach(Thread::start);
+
+        if (LOG.isInfoEnabled()) {
+            LOG.info("NioRpcServer has been started at: {}", ss.socket().getLocalSocketAddress());
+        }
     }
 
     @Override
@@ -102,6 +111,8 @@ public class NioRpcServer extends RpcServer {
                 }
             }
         }
+
+        workerPool.shutdown();
     }
 
     @Override
@@ -118,12 +129,36 @@ public class NioRpcServer extends RpcServer {
         int numCores = Runtime.getRuntime().availableProcessors();
         int selectThreadNums = (int) Math.sqrt(numCores >>> 1);
         int workerNums = numCores << 1;
+
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("numCores: {}, selectThreadNums: {}, workerNums: {}", numCores, selectThreadNums, workerNums);
+        }
+
         selectThreads = new ArrayList<>(selectThreadNums);
         for (int i = 0; i < selectThreadNums; i++) {
             selectThreads.set(i, new SelectThread(i));
         }
         acceptThread = new AcceptThread(selectThreads);
-        workerPool = new ThreadPoolExecutor(workerNums, workerNums, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(workerNums));
+        workerPool = new ThreadPoolExecutor(workerNums,
+                workerNums,
+                0L,
+                TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>(Math.max(workerNums, 64)),
+                new ThreadFactory() {
+
+                    private AtomicInteger threadCount = new AtomicInteger(1);
+
+                    @Override
+                    public Thread newThread(Runnable r) {
+                        return new QrpcThread("NioWorker-" + threadCount.getAndIncrement()) {
+
+                            @Override
+                            public void run() {
+                                r.run();
+                            }
+                        };
+                    }
+                });
     }
 
     private abstract static class AbstractSelectorThread extends QrpcThread {
@@ -238,9 +273,9 @@ public class NioRpcServer extends RpcServer {
                 SelectionKey sk = skIter.next();
                 skIter.remove();
                 if (!sk.isValid()) { // 无效的selectionKey，直接忽略
-                    continue;
+                    NioUtils.cancelSelectionKey(sk);
                 }
-                if (sk.isAcceptable() && !doAccept()) {
+                else if (sk.isAcceptable() && !doAccept()) {
                     pauseAccept();
                 }
                 else {
@@ -324,31 +359,43 @@ public class NioRpcServer extends RpcServer {
             while (skIter.hasNext()) {
                 SelectionKey sk = skIter.next();
                 skIter.remove();
-                if (sk.isReadable() || sk.isWritable()) {
+                if (!sk.isValid()) {
+                    NioUtils.cancelSelectionKey(sk);
+                }
+                else if (sk.isReadable() || sk.isWritable()) {
                     // 处理io操作
                     doIO(sk);
+                }
+                else {
+                    LOG.warn("The current SelectionKey: {} is not READ or WRITE ops", sk);
                 }
             }
         }
 
         private void doIO(SelectionKey sk) {
+            RpcConnection attachment = (RpcConnection) sk.attachment();
+            if (!(attachment instanceof NioRpcConnection)) {
+                throw new IllegalStateException("Not an NioRpcConnection: " + attachment);
+            }
+            NioRpcConnection conn = (NioRpcConnection) attachment;
+            // TODO 对连接做一些必要的设置
             // 将io处理任务提交到worker线程
-            workerPool.execute(() -> {
-                RpcConnection rc = (RpcConnection) sk.attachment();
-                if (!(rc instanceof NioRpcConnection)) {
-                    throw new IllegalStateException("Not an NioRpcConnection: " + rc);
-                }
-                NioRpcConnection conn = ((NioRpcConnection) rc);
-                conn.doIO(SelectThread.this);
-            });
+            workerPool.execute(() -> conn.handlIO(SelectThread.this));
         }
 
-        private void processAcceptSocketChannel() throws ClosedChannelException {
+        private void processAcceptSocketChannel() {
             SocketChannel sc;
             while (isRunning() && Objects.nonNull(sc = acceptSocketChannelQueue.poll())) {
-                SelectionKey sk = sc.register(selector, SelectionKey.OP_READ);
-                RpcConnection conn = new NioRpcConnection(sk);
-                sk.attach(conn);
+                SelectionKey sk;
+                try {
+                    sk = sc.register(selector, SelectionKey.OP_READ);
+                    RpcConnection conn = new NioRpcConnection(sk);
+                    sk.attach(conn);
+                }
+                catch (IOException e) {
+                    // 忽略异常信息
+                    NioUtils.closeSocketChannelQuietly(sc);
+                }
             }
         }
 

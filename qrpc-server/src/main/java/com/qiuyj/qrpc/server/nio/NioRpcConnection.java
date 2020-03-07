@@ -25,7 +25,7 @@ class NioRpcConnection implements RpcConnection {
      * 处理io任务（包括从客户端读取数据，以及向客户端写入数据）
      * @param selectThread 当前操作所在的{@code SelectThread}
      */
-    void doIO(NioRpcServer.SelectThread selectThread) {
+    void handlIO(NioRpcServer.SelectThread selectThread) {
 
     }
 }

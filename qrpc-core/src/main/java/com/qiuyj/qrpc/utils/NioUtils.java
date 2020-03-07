@@ -4,6 +4,7 @@ import com.qiuyj.qrpc.logger.InternalLogger;
 import com.qiuyj.qrpc.logger.InternalLoggerFactory;
 
 import java.io.IOException;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
@@ -67,6 +68,12 @@ public abstract class NioUtils {
             catch (IOException e) {
                 LOG.warn("Ignore the exception that failed to close the selector", e);
             }
+        }
+    }
+
+    public static void cancelSelectionKey(SelectionKey sk) {
+        if (Objects.nonNull(sk)) {
+            sk.cancel();
         }
     }
 }
