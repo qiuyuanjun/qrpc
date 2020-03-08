@@ -9,6 +9,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -29,7 +31,7 @@ public class DefaultServiceDescriptorContainer extends AbstractServiceRegistrar 
     }
 
     @Override
-    protected ServiceDescriptor doRegist(Class<?> interfaceClass, Object rpcService) {
+    protected ServiceDescriptor doRegister(Class<?> interfaceClass, Object rpcService) {
         if (!interfaceClass.isInterface()) {
             throw new IllegalArgumentException("Class: " + interfaceClass + " is not an interface class");
         }
@@ -52,7 +54,34 @@ public class DefaultServiceDescriptorContainer extends AbstractServiceRegistrar 
     }
 
     @Override
-    protected void doUnregist(Class<?> interfaceClass) {
+    protected List<ServiceDescriptor> doRegisterAll(Map<Class<?>, ?> rpcServices) {
+        serviceDescriptorMapLock.writeLock().lock();
+        try {
+            Map<Class<?>, ServiceDescriptor> serviceDescriptors = rpcServices.entrySet()
+                    .stream()
+                    .collect(HashMap::new, (m, c) -> {
+                        Class<?> interfaceClass = c.getKey();
+                        if (!interfaceClass.isInterface()) {
+                            throw new IllegalArgumentException("Class: " + interfaceClass + " is not an interface class");
+                        }
+                        if (serviceDescriptorMap.containsKey(interfaceClass)) {
+                            throw new IllegalStateException("RPC instance object with interface name: " + interfaceClass + " already exists");
+                        }
+                        m.put(interfaceClass, new ServiceDescriptor(interfaceClass, c.getValue()));
+                    }, HashMap::putAll);
+            if (serviceDescriptors.isEmpty()) {
+                return List.of();
+            }
+            serviceDescriptorMap.putAll(serviceDescriptors);
+            return new ArrayList<>(serviceDescriptors.values());
+        }
+        finally {
+            serviceDescriptorMapLock.writeLock().unlock();
+        }
+    }
+
+    @Override
+    protected void doUnregister(Class<?> interfaceClass) {
         serviceDescriptorMapLock.writeLock().lock();
         try {
             serviceDescriptorMap.remove(interfaceClass);
@@ -63,7 +92,7 @@ public class DefaultServiceDescriptorContainer extends AbstractServiceRegistrar 
     }
 
     @Override
-    protected void doUnregistAll(List<Class<?>> interfaceClasses) {
+    protected void doUnregisterAll(List<Class<?>> interfaceClasses) {
         serviceDescriptorMapLock.writeLock().lock();
         try {
             serviceDescriptorMap.keySet().removeAll(interfaceClasses);

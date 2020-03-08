@@ -113,38 +113,38 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
     //--------------------------------ServiceRegistrar
 
     @Override
-    public <E> Optional<ServiceDescriptor> regist(E rpcService) {
+    public <E> Optional<ServiceDescriptor> register(E rpcService) {
         if (Objects.isNull(rpcService)) {
             throw new NullPointerException("rpcService");
         }
-        Optional<ServiceDescriptor> serviceDescriptor = serviceDescriptorContainer.regist(rpcService);
+        Optional<ServiceDescriptor> serviceDescriptor = serviceDescriptorContainer.register(rpcService);
         serviceDescriptor.ifPresent(this::registToServiceRegistrationIfNecessary);
         return serviceDescriptor;
     }
 
     private void registToServiceRegistrationIfNecessary(ServiceDescriptor serviceDescriptor) {
         if (config.isEnableServiceRegistration() && isRunning()) {
-            multiRegistToServiceRegistrationIfNecessary(List.of(serviceDescriptor));
+            multiRegisterToServiceRegistrationIfNecessary(List.of(serviceDescriptor));
         }
     }
 
     @Override
-    public <E> Optional<ServiceDescriptor> regist(Class<? super E> interfaceClass, E rpcService) {
+    public <E> Optional<ServiceDescriptor> register(Class<? super E> interfaceClass, E rpcService) {
         if (Objects.isNull(interfaceClass)) {
-            return regist(rpcService);
+            return register(rpcService);
         }
         else if (Objects.isNull(rpcService)) {
             throw new NullPointerException("rpcService");
         }
         else {
-            Optional<ServiceDescriptor> serviceDescriptor = serviceDescriptorContainer.regist(interfaceClass, rpcService);
+            Optional<ServiceDescriptor> serviceDescriptor = serviceDescriptorContainer.register(interfaceClass, rpcService);
             serviceDescriptor.ifPresent(this::registToServiceRegistrationIfNecessary);
             return serviceDescriptor;
         }
     }
 
     @Override
-    public <E> List<ServiceDescriptor> registAll(Collection<?> rpcServices) {
+    public <E> List<ServiceDescriptor> registerAll(Collection<?> rpcServices) {
         Objects.requireNonNull(rpcServices, "rpcServices");
         List<ServiceDescriptor> serviceDescriptors;
         if (rpcServices.isEmpty()) {
@@ -152,20 +152,20 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
             LOG.warn("Empty rpcServiecs and do nothing");
         }
         else {
-            serviceDescriptors = serviceDescriptorContainer.<E>registAll(rpcServices);
-            multiRegistToServiceRegistrationIfNecessary(serviceDescriptors);
+            serviceDescriptors = serviceDescriptorContainer.<E>registerAll(rpcServices);
+            multiRegisterToServiceRegistrationIfNecessary(serviceDescriptors);
         }
         return serviceDescriptors;
     }
 
-    private void multiRegistToServiceRegistrationIfNecessary(List<ServiceDescriptor> serviceDescriptors) {
+    private void multiRegisterToServiceRegistrationIfNecessary(List<ServiceDescriptor> serviceDescriptors) {
         if (config.isEnableServiceRegistration() && isRunning() && !serviceDescriptors.isEmpty()) {
             Partition<ServiceDescriptor> serviceProxyPartition = new Partition<>(serviceDescriptors);
             while (serviceProxyPartition.hasNext()) {
                 List<ServiceDescriptor> sub = serviceProxyPartition.next();
                 if (!asyncServiceRegistrationUnregistrationQueue.offer(new RegistrationUnregistrationInfo(sub, true))) {
                     // 此时，注册队列已经满了，那么注册失败，移除之前注册的所有服务
-                    unregistAll(serviceDescriptors, false);
+                    unregisterAll(serviceDescriptors, false);
                     throw new IllegalStateException("asyncServiceRegistrationUnregistrationQueue has been fulled");
                 }
 //                try {
@@ -183,7 +183,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
     }
 
     @Override
-    public <E> List<ServiceDescriptor> registAll(Map<Class<?>, ?> rpcServices) {
+    public <E> List<ServiceDescriptor> registerAll(Map<Class<?>, ?> rpcServices) {
         Objects.requireNonNull(rpcServices, "rpcServices");
         List<ServiceDescriptor> serviceDescriptors;
         if (rpcServices.isEmpty()) {
@@ -191,26 +191,26 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
             LOG.warn("Empty rpcServiecs and do nothing");
         }
         else {
-            serviceDescriptors = serviceDescriptorContainer.<E>registAll(rpcServices);
-            multiRegistToServiceRegistrationIfNecessary(serviceDescriptors);
+            serviceDescriptors = serviceDescriptorContainer.<E>registerAll(rpcServices);
+            multiRegisterToServiceRegistrationIfNecessary(serviceDescriptors);
         }
         return serviceDescriptors;
     }
 
     @Override
-    public boolean unregist(ServiceDescriptor serviceDescriptor) {
+    public boolean unregister(ServiceDescriptor serviceDescriptor) {
         Objects.requireNonNull(serviceDescriptor, "serviceDescriptor");
-        unregistFromServiceRegistrationIfNecessary(serviceDescriptor);
-        return serviceDescriptorContainer.unregist(serviceDescriptor);
+        unregisterFromServiceRegistrationIfNecessary(serviceDescriptor);
+        return serviceDescriptorContainer.unregister(serviceDescriptor);
     }
 
-    private void unregistFromServiceRegistrationIfNecessary(ServiceDescriptor serviceDescriptor) {
+    private void unregisterFromServiceRegistrationIfNecessary(ServiceDescriptor serviceDescriptor) {
         if (config.isEnableServiceRegistration()) {
-            multiUnregistFromServiceRegistrationIfNecessary(List.of(serviceDescriptor));
+            multiUnregisterFromServiceRegistrationIfNecessary(List.of(serviceDescriptor));
         }
     }
 
-    private void multiUnregistFromServiceRegistrationIfNecessary(List<ServiceDescriptor> serviceDescriptors) {
+    private void multiUnregisterFromServiceRegistrationIfNecessary(List<ServiceDescriptor> serviceDescriptors) {
         if (config.isEnableServiceRegistration() && !serviceDescriptors.isEmpty()) {
             Partition<ServiceDescriptor> serviceProxyPartition = new Partition<>(serviceDescriptors);
             while (serviceProxyPartition.hasNext()) {
@@ -222,17 +222,17 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
         }
     }
 
-    private boolean unregistAll(List<ServiceDescriptor> serviceDescriptors, boolean unregistFromServiceRegistration) {
+    private boolean unregisterAll(List<ServiceDescriptor> serviceDescriptors, boolean unregisterFromServiceRegistration) {
         Objects.requireNonNull(serviceDescriptors, "serviceDescriptors");
-        if (unregistFromServiceRegistration) {
-            multiUnregistFromServiceRegistrationIfNecessary(serviceDescriptors);
+        if (unregisterFromServiceRegistration) {
+            multiUnregisterFromServiceRegistrationIfNecessary(serviceDescriptors);
         }
-        return !serviceDescriptors.isEmpty() && serviceDescriptorContainer.unregistAll(serviceDescriptors);
+        return !serviceDescriptors.isEmpty() && serviceDescriptorContainer.unregisterAll(serviceDescriptors);
     }
 
     @Override
-    public boolean unregistAll(List<ServiceDescriptor> serviceDescriptors) {
-        return unregistAll(serviceDescriptors, true);
+    public boolean unregisterAll(List<ServiceDescriptor> serviceDescriptors) {
+        return unregisterAll(serviceDescriptors, true);
     }
 
     private class AsyncServiceRegistrationUnregistrationThread extends QrpcThread {
