@@ -12,6 +12,7 @@ import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
+import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
 /**
@@ -54,11 +55,13 @@ public class NettyRpcServer extends RpcServer {
         serverBootstrap = new ServerBootstrap()
                 .channel(channelClass)
                 .group(parentEventLoopGroup, childEventLoopGroup)
+                .option(ChannelOption.SO_REUSEADDR, true)
                 .childOption(ChannelOption.SO_REUSEADDR, true)
-                .childHandler(new ChannelInitializer<ServerSocketChannel>() {
+                .childOption(ChannelOption.TCP_NODELAY, true)
+                .childHandler(new ChannelInitializer<SocketChannel>() {
 
                     @Override
-                    protected void initChannel(ServerSocketChannel ch) {
+                    protected void initChannel(SocketChannel ch) {
                     }
                 });
     }
