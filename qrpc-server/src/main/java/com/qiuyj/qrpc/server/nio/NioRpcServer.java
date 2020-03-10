@@ -380,7 +380,14 @@ public class NioRpcServer extends RpcServer {
             NioRpcConnection conn = (NioRpcConnection) attachment;
             // TODO 对连接做一些必要的设置
             // 将io处理任务提交到worker线程
-            workerPool.execute(() -> conn.handlIO(SelectThread.this));
+            workerPool.execute(() -> {
+                try {
+                    conn.handlIO(SelectThread.this);
+                }
+                catch (IOException e) {
+                    LOG.error("Unexpected exception while handle reading or writing IO operation", e);
+                }
+            });
         }
 
         private void processAcceptSocketChannel() {

@@ -7,4 +7,10 @@ package com.qiuyj.qrpc.cnxn;
  */
 public interface RpcConnection {
 
+    /**
+     * 发送消息
+     * @param message 消息内容
+     */
+    void sendMessage(Object message);
+
 }
