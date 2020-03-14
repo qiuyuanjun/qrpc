@@ -4,7 +4,7 @@
  */
 module qrpc.core {
     requires transitive qrpc.log;
-    requires jdk.unsupported;
+    requires transitive jdk.unsupported;
 
     exports com.qiuyj.qrpc;
     exports com.qiuyj.qrpc.annotation;

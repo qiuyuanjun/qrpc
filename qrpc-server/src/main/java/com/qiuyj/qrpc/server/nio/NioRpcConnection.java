@@ -1,10 +1,13 @@
 package com.qiuyj.qrpc.server.nio;
 
 import com.qiuyj.qrpc.cnxn.RpcConnection;
+import com.qiuyj.qrpc.logger.InternalLogger;
+import com.qiuyj.qrpc.logger.InternalLoggerFactory;
 import com.qiuyj.qrpc.utils.UnsafeAccess;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Objects;
@@ -15,6 +18,8 @@ import java.util.Objects;
  * @since 2020-03-05
  */
 class NioRpcConnection implements RpcConnection {
+
+    private static final InternalLogger LOG = InternalLoggerFactory.getLogger(NioRpcConnection.class);
 
     private final SelectionKey selectionKey;
 
@@ -40,28 +45,40 @@ class NioRpcConnection implements RpcConnection {
      * @param selectThread 当前操作所在的{@code SelectThread}
      */
     void handlIO(NioRpcServer.SelectThread selectThread) throws IOException {
+        if (!isOpen()) {
+            return;
+        }
         if (selectionKey.isReadable()) {
             byte[] recvBytes = null;
             synchronized (socketChannel) {
+                int len = -1;
                 try {
                     if (Objects.nonNull(messageBody)) {
                         assert messageBody.capacity() == messageLength.getInt();
                         if (messageBody.hasRemaining()) {
                             // 可能是由于tcp的粘包和拆包造成的，此时需要继续读取messageBody
-                            socketChannel.read(messageBody);
+                            len = socketChannel.read(messageBody);
                         }
                     }
                     else {
-                        socketChannel.read(messageLength);
-                        if (!messageLength.hasRemaining()) {
+                        len = socketChannel.read(messageLength);
+                        if (len >= 0 && !messageLength.hasRemaining()) {
                             messageBody = ByteBuffer.allocate(messageLength.flip().getInt());
-                            socketChannel.read(messageBody);
+                            len = socketChannel.read(messageBody);
                         }
                     }
                 }
-                catch (IOException e) {
+                catch (ClosedChannelException e) {
                     resetMessageReadable();
-                    throw e;
+                    return;
+                }
+                // 如果是客户端关闭了连接，那么服务器端依然能够接收到OP_READ时间，但是读取数据返回的长度会是-1
+                // 此时需要服务器端主动关闭和客户端之间的channel
+                if (len < 0) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Current channel {} has been closed", socketChannel.getRemoteAddress());
+                    }
+                    close();
                 }
 
                 if (Objects.nonNull(messageBody) && !messageBody.hasRemaining()) {
@@ -76,11 +93,11 @@ class NioRpcConnection implements RpcConnection {
                 // 对字节数组做反序列化操作
                 System.out.println("收到客户端消息：" + new String(recvBytes) + ", Thread name: " + Thread.currentThread().getName() + ", SelectThread's name: " + selectThread.getName());
                 // 注册当前selector，对OP_WRITE事件感兴趣
-
+//                selectionKey.interestOpsOr(SelectionKey.OP_WRITE);
             }
         }
         else if (selectionKey.isWritable()) {
-
+            System.out.println("write event");
         }
     }
 
@@ -104,6 +121,26 @@ class NioRpcConnection implements RpcConnection {
         finally {
             // 清理分配的directBuffer
             UnsafeAccess.getUnsafe().invokeCleaner(sendBytes);
+        }
+    }
+
+    @Override
+    public boolean isOpen() {
+        return socketChannel.isOpen();
+    }
+
+    @Override
+    public void close() throws IOException {
+        socketChannel.close();
+        selectionKey.cancel();
+    }
+
+    void closeQuietly() {
+        try {
+            close();
+        }
+        catch (IOException e) {
+            // ignore
         }
     }
 }

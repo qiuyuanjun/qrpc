@@ -17,7 +17,7 @@ import io.netty.handler.codec.MessageToByteEncoder;
  */
 public class RpcClientTest {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         Bootstrap b = new Bootstrap()
                 .channel(NioSocketChannel.class)
                 .group(new NioEventLoopGroup())
@@ -41,8 +41,9 @@ public class RpcClientTest {
         ChannelFuture f = b.connect("127.0.0.1", 11221).syncUninterruptibly();
         for (int i = 1; i <= 1000; i++) {
             f.channel().writeAndFlush("Hello rpc server, this is rpc client's message of seria number: " + i);
+            Thread.sleep(10);
         }
-//        f.channel().close();
-//        b.config().group().shutdownGracefully();
+        f.channel().close();
+        b.config().group().shutdownGracefully();
     }
 }

@@ -370,7 +370,7 @@ public class NioRpcServer extends RpcServer {
                 }
                 else if (sk.isReadable() || sk.isWritable()) {
                     // 处理io操作
-                    doIO(sk);
+                    handlIO(sk);
                 }
                 else {
                     LOG.warn("The current SelectionKey: {} is not READ or WRITE ops", sk);
@@ -378,12 +378,16 @@ public class NioRpcServer extends RpcServer {
             }
         }
 
-        private void doIO(SelectionKey sk) {
+        private void handlIO(SelectionKey sk) {
             RpcConnection attachment = (RpcConnection) sk.attachment();
             if (!(attachment instanceof NioRpcConnection)) {
                 throw new IllegalStateException("Not an NioRpcConnection: " + attachment);
             }
             NioRpcConnection conn = (NioRpcConnection) attachment;
+            if (!conn.isOpen()) {
+                LOG.warn("NioRpcConnection has been closed, and ignore current IO handle");
+                return;
+            }
             // TODO 对连接做一些必要的设置
             // 将io处理任务提交到worker线程
             workerPool.execute(() -> {
@@ -391,7 +395,10 @@ public class NioRpcServer extends RpcServer {
                     conn.handlIO(SelectThread.this);
                 }
                 catch (IOException e) {
-                    LOG.error("Unexpected exception while handle reading or writing IO operation", e);
+                    // 抛出IO异常，一般是客户端被动关闭了channel（比如强制kill客户端的进程）
+                    // 此时，服务器端也要同步关闭掉和客户端连接的channel
+                    conn.closeQuietly();
+                    LOG.error("Unexpected IO exception while handle reading or writing operations", e);
                 }
             });
         }
@@ -401,6 +408,8 @@ public class NioRpcServer extends RpcServer {
             while (isRunning() && Objects.nonNull(sc = acceptSocketChannelQueue.poll())) {
                 SelectionKey sk;
                 try {
+                    sc.setOption(StandardSocketOptions.TCP_NODELAY, true);
+                    sc.setOption(StandardSocketOptions.SO_REUSEADDR, true);
                     sk = sc.register(selector, SelectionKey.OP_READ);
                     RpcConnection conn = new NioRpcConnection(sk);
                     sk.attach(conn);
