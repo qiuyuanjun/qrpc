@@ -17,7 +17,6 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -134,11 +133,12 @@ public class NioRpcServer extends RpcServer {
             LOG.debug("numCores: {}, selectThreadNums: {}, workerNums: {}", numCores, selectThreadNums, workerNums);
         }
 
-        selectThreads = new ArrayList<>(selectThreadNums);
+        SelectThread[] selectThreads = new SelectThread[selectThreadNums];
         for (int i = 0; i < selectThreadNums; i++) {
-            selectThreads.set(i, new SelectThread(i));
+            selectThreads[i] = new SelectThread(i + 1);
         }
-        acceptThread = new AcceptThread(selectThreads);
+        this.selectThreads = List.of(selectThreads);
+        acceptThread = new AcceptThread(this.selectThreads);
         workerPool = new ThreadPoolExecutor(workerNums,
                 workerNums,
                 0L,
@@ -172,7 +172,7 @@ public class NioRpcServer extends RpcServer {
         /**
          * 初始化selector
          */
-        private void initSelector() {
+        protected void initSelector() {
             try {
                 selector = Selector.open();
             }
@@ -227,7 +227,11 @@ public class NioRpcServer extends RpcServer {
         private AcceptThread(List<SelectThread> selectThreads) {
             super("NIO-Accept");
             this.selectThreads = Collections.unmodifiableList(selectThreads);
+        }
 
+        @Override
+        protected void initSelector() {
+            super.initSelector();
             // 将当前AcceptThread的Selector注册到ServerSocketChannel上，并接受ACCEPT事件
             try {
                 this.acceptSk = ss.register(selector, SelectionKey.OP_ACCEPT);
@@ -258,7 +262,7 @@ public class NioRpcServer extends RpcServer {
         private void acceptSocketChannel() throws IOException {
             int n = selector.select();
             if (LOG.isDebugEnabled()) {
-                LOG.debug("The current selector has received {} ACCEPT event keys", n);
+                LOG.debug("The current acceptThread's selector has received {} ACCEPT event keys", n);
             }
 
             processSelectedAcceptKeys(selector.selectedKeys());
@@ -275,8 +279,10 @@ public class NioRpcServer extends RpcServer {
                 if (!sk.isValid()) { // 无效的selectionKey，直接忽略
                     NioUtils.cancelSelectionKey(sk);
                 }
-                else if (sk.isAcceptable() && !doAccept()) {
-                    pauseAccept();
+                else if (sk.isAcceptable()) {
+                    if (!doAccept()) {
+                        pauseAccept();
+                    }
                 }
                 else {
                     LOG.warn("The current SelectionKey: {} is not ACCEPT ops", sk);
@@ -352,7 +358,7 @@ public class NioRpcServer extends RpcServer {
         private void select() throws IOException {
             int n = selector.select();
             if (LOG.isDebugEnabled()) {
-                LOG.debug("The current selector has received {} READ and WRITE event keys", n);
+                LOG.debug("The current selectThread [{}]'s selector has received {} READ or WRITE event keys", getName(), n);
             }
 
             Iterator<SelectionKey> skIter = selector.selectedKeys().iterator();
