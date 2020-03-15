@@ -13,11 +13,17 @@ public class QrpcException extends RuntimeException {
     public static final int ERR_CODE_SERVICE_NOT_FOUND = 1;
 
     /**
+     * 需要检查的异常未处理
+     */
+    public static final int ERR_CODE_CAUGHT_EXCEPTION_UNHANDLER = 2;
+
+    /**
      * 错误码
      */
     private final int errorCode;
 
-    public QrpcException(int errorCode) {
+    public QrpcException(int errorCode, Throwable cause) {
+        super(cause);
         this.errorCode = errorCode;
     }
 

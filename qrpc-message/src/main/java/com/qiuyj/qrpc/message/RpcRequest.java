@@ -19,6 +19,8 @@ public class RpcRequest implements Serializable {
 
     private static final String[] EMPTY_STRING_ARRAY = new String[0];
 
+    private static final long serialVersionUID = -8837942011123431741L;
+
     /**
      * 当次请求id，全局唯一
      */
@@ -57,6 +59,16 @@ public class RpcRequest implements Serializable {
 
     public String[] getMethodArgTypes() {
         return methodArgTypes;
+    }
+
+    @Override
+    public String toString() {
+        return "RpcRequest{" +
+                "requestId='" + requestId + '\'' +
+                ", interfaceName='" + interfaceName + '\'' +
+                ", methodName='" + methodName + '\'' +
+                ", methodArgTypes=" + Arrays.toString(methodArgTypes) +
+                '}';
     }
 
     public static class Builder {
@@ -118,13 +130,15 @@ public class RpcRequest implements Serializable {
         }
 
         public RpcRequest build() {
+            if (StringUtils.isEmpty(requestId)
+                    || StringUtils.isEmpty(interfaceName)
+                    || StringUtils.isEmpty(methodName)) {
+                throw new IllegalArgumentException("requestId, interfaceName and methodName must not be empty");
+            }
             RpcRequest request = new RpcRequest();
             request.requestId = this.requestId;
             request.interfaceName = this.interfaceName;
             request.methodName = this.methodName;
-            if (StringUtils.isEmpty(request.interfaceName) || StringUtils.isEmpty(request.methodName)) {
-                throw new IllegalArgumentException("interfaceName and methodName must not be null");
-            }
             request.methodArgTypes = CollectionUtils.isEmpty(this.methodArgTypes)
                     ? EMPTY_STRING_ARRAY
                     : this.methodArgTypes.toArray(EMPTY_STRING_ARRAY);
