@@ -10,5 +10,5 @@ module qrpc.core {
     exports com.qiuyj.qrpc.annotation;
     exports com.qiuyj.qrpc.cnxn to qrpc.server;
     exports com.qiuyj.qrpc.filter;
-    exports com.qiuyj.qrpc.utils to qrpc.server;
+    exports com.qiuyj.qrpc.utils to qrpc.server, qrpc.message;
 }

@@ -14,6 +14,7 @@
         <module>qrpc-log</module>
         <module>qrpc-core</module>
         <module>qrpc-spring</module>
+        <module>qrpc-message</module>
     </modules>
 
     <properties>
@@ -24,13 +25,14 @@
         <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
         <netty.version>4.1.46.Final</netty.version>
         <spring.version>5.2.4.RELEASE</spring.version>
+        <junit.version>5.6.0</junit.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
-            <version>5.6.0</version>
+            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -50,6 +52,11 @@
             <dependency>
                 <groupId>com.qiuyj</groupId>
                 <artifactId>qrpc-server</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.qiuyj</groupId>
+                <artifactId>qrpc-message</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
