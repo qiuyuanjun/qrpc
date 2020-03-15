@@ -33,7 +33,7 @@ public class DefaultServiceDescriptorContainer extends AbstractServiceRegistrar 
     @Override
     protected ServiceDescriptor doRegister(Class<?> interfaceClass, Object rpcService) {
         if (!interfaceClass.isInterface()) {
-            throw new IllegalArgumentException("Class: " + interfaceClass + " is not an interface class");
+            throw new RegisterException(interfaceClass, "Class: " + interfaceClass + " is not an interface class");
         }
         ServiceDescriptorHolder holder = new ServiceDescriptorHolder();
         serviceDescriptorMap.computeIfAbsent(interfaceClass, k -> {
@@ -41,7 +41,7 @@ public class DefaultServiceDescriptorContainer extends AbstractServiceRegistrar 
             return holder.serviceDescriptor;
         });
         if (Objects.isNull(holder.serviceDescriptor)) {
-            throw new IllegalStateException("RPC instance object with interface name: " + interfaceClass + " already exists");
+            throw new RegisterException(interfaceClass, "RPC instance object with interface name: " + interfaceClass + " already exists");
         }
         if (LOG.isDebugEnabled()) {
             LOG.debug("Regist rpc service {} with interface {}", rpcService, interfaceClass);

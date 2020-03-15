@@ -3,7 +3,7 @@
  * @since 2020-03-15
  */
 module qrpc.message {
-    requires qrpc.core;
+    requires transitive qrpc.core;
 
     exports com.qiuyj.qrpc.message;
 }

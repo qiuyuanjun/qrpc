@@ -17,6 +17,10 @@
             <groupId>com.qiuyj</groupId>
             <artifactId>qrpc-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.qiuyj</groupId>
+            <artifactId>qrpc-message</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>io.netty</groupId>

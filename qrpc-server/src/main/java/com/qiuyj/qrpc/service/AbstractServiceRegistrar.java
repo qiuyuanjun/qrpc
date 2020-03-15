@@ -6,6 +6,7 @@ import com.qiuyj.qrpc.logger.InternalLoggerFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -121,16 +122,22 @@ public abstract class AbstractServiceRegistrar implements ServiceRegistrar {
     }
 
     private List<ServiceDescriptor> commonRegistAll(Map<Class<?>, ?> checkedServices) {
+        LinkedList<Class<?>> registered = new LinkedList<>();
         try {
             return checkedServices.entrySet()
                     .stream()
                     .collect(ArrayList::new,
-                            (l, e) -> l.add(doRegister(e.getKey(), e.getValue())),
+                            (l, e) -> {
+                                registered.addFirst(e.getKey());
+                                l.add(doRegister(e.getKey(), e.getValue()));
+                            },
                             ArrayList::addAll);
         }
-        catch (Exception e) {
+        catch (RegisterException e) {
             // 可能会抛出异常，那么抛出异常，需要注销掉所有已经注册的服务
-            checkedServices.keySet().forEach(this::doUnregister);
+            Class<?> failedRegister = registered.removeFirst();
+            assert failedRegister == e.getFailedRegisteredInterfaceClass();
+            registered.forEach(this::doUnregister);
             throw e;
         }
     }

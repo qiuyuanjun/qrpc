@@ -3,7 +3,7 @@
  * @since 2020-02-25
  */
 module qrpc.server {
-    requires transitive qrpc.core;
+    requires transitive qrpc.message;
     requires static io.netty.all;
 
     exports com.qiuyj.qrpc.server;
