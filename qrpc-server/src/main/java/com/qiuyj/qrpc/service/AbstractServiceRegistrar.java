@@ -3,13 +3,13 @@ package com.qiuyj.qrpc.service;
 import com.qiuyj.qrpc.logger.InternalLogger;
 import com.qiuyj.qrpc.logger.InternalLoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * @author qiuyj
@@ -95,24 +95,7 @@ public abstract class AbstractServiceRegistrar implements ServiceRegistrar {
 
     @Override
     public <E> List<ServiceDescriptor> registerAll(Collection<?> rpcServices) {
-        /*return rpcServices.stream()
-                .collect(HashMap::new, (m, o) -> {
-                    Class<?> rpcInterface = getRpcInterface(o);
-                    if (Objects.isNull(checkType(rpcInterface, o))) {
-                        // 忽略类型不匹配的情况，那么就记录日志，并且直接返回
-                        LOG.warn("Type mismatch, rpc service: {} is not an instance of interface: {}, and ignore regist",
-                                o, rpcInterface);
-                    }
-                    else {
-                        m.put(rpcInterface, o);
-                    }
-                }, HashMap::putAll)
-                .entrySet()
-                .stream()
-                .collect(ArrayList::new,
-                        (l, e) -> l.add(doRegister((Class<?>) e.getKey(), e.getValue())),
-                        ArrayList::addAll);*/
-        return doRegisterAll(rpcServices.stream()
+        return commonRegistAll(rpcServices.stream()
                 .collect(HashMap::new, (m, o) -> {
                     Class<?> rpcInterface = getRpcInterface(o);
                     if (Objects.isNull(checkType(rpcInterface, o))) {
@@ -128,14 +111,28 @@ public abstract class AbstractServiceRegistrar implements ServiceRegistrar {
 
     @Override
     public <E> List<ServiceDescriptor> registerAll(Map<Class<?>, ?> rpcServices) {
-        // 检测所有的类型是否匹配
-        rpcServices.forEach(this::checkType);
-        /*return rpcServices.entrySet()
+        // 检测所有的类型是否匹配，如果ignoreTypeMismatch为true的话，那么过滤掉类型不匹配的
+        return commonRegistAll(rpcServices.entrySet()
                 .stream()
-                .collect(ArrayList::new,
-                        (l, e) -> register((Class<? super E>) e.getKey(), (E) e.getValue()).ifPresent(l::add),
-                        ArrayList::addAll);*/
-        return doRegisterAll(rpcServices);
+                .filter(me -> Objects.nonNull(checkType(me.getKey(), me.getValue())))
+                .collect(HashMap::new,
+                        (m, me) -> m.put(me.getKey(), me.getValue()),
+                        HashMap::putAll));
+    }
+
+    private List<ServiceDescriptor> commonRegistAll(Map<Class<?>, ?> checkedServices) {
+        try {
+            return checkedServices.entrySet()
+                    .stream()
+                    .collect(ArrayList::new,
+                            (l, e) -> l.add(doRegister(e.getKey(), e.getValue())),
+                            ArrayList::addAll);
+        }
+        catch (Exception e) {
+            // 可能会抛出异常，那么抛出异常，需要注销掉所有已经注册的服务
+            checkedServices.keySet().forEach(this::doUnregister);
+            throw e;
+        }
     }
 
     /**
@@ -145,8 +142,6 @@ public abstract class AbstractServiceRegistrar implements ServiceRegistrar {
      */
     protected abstract ServiceDescriptor doRegister(Class<?> interfaceClass, Object rpcService);
 
-    protected abstract List<ServiceDescriptor> doRegisterAll(Map<Class<?>, ?> rpcServices);
-
     @Override
     public boolean unregister(ServiceDescriptor serviceDescriptor) {
         doUnregister(serviceDescriptor.getInterface());
@@ -155,10 +150,7 @@ public abstract class AbstractServiceRegistrar implements ServiceRegistrar {
 
     @Override
     public boolean unregisterAll(List<ServiceDescriptor> serviceDescriptors) {
-        List<Class<?>> keys = serviceDescriptors.stream()
-                .map(ServiceDescriptor::getInterface)
-                .collect(Collectors.toList());
-        doUnregisterAll(keys);
+        serviceDescriptors.forEach(this::unregister);
         return true;
     }
 
@@ -167,6 +159,4 @@ public abstract class AbstractServiceRegistrar implements ServiceRegistrar {
      * @param interfaceClass rpc接口
      */
     protected abstract void doUnregister(Class<?> interfaceClass);
-
-    protected abstract void doUnregisterAll(List<Class<?>> interfaceClasses);
 }
