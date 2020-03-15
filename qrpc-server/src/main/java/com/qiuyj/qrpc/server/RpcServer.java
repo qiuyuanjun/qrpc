@@ -9,6 +9,7 @@ import com.qiuyj.qrpc.service.ServiceDescriptorContainer;
 import com.qiuyj.qrpc.service.ServiceRegistrar;
 import com.qiuyj.qrpc.utils.Partition;
 
+import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -59,6 +60,12 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
     public void configure(RpcServerConfig serverConfig) {
         // do nothing
     }
+
+    public int getPort() {
+        return config.getPort();
+    }
+
+    public abstract InetSocketAddress getLocalAddress();
 
     //--------------------------------Lifecycle
 

@@ -15,6 +15,8 @@ import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
+import java.net.InetSocketAddress;
+
 /**
  * 基于netty的rpc服务器的实现
  * @author qiuyj
@@ -64,5 +66,10 @@ public class NettyRpcServer extends RpcServer {
                     protected void initChannel(SocketChannel ch) {
                     }
                 });
+    }
+
+    @Override
+    public InetSocketAddress getLocalAddress() {
+        return null;
     }
 }

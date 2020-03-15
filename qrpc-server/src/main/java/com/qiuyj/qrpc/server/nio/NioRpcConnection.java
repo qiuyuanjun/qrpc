@@ -1,6 +1,6 @@
 package com.qiuyj.qrpc.server.nio;
 
-import com.qiuyj.qrpc.cnxn.RpcConnection;
+import com.qiuyj.qrpc.cnxn.AbstractRpcConnection;
 import com.qiuyj.qrpc.logger.InternalLogger;
 import com.qiuyj.qrpc.logger.InternalLoggerFactory;
 import com.qiuyj.qrpc.utils.UnsafeAccess;
@@ -17,7 +17,7 @@ import java.util.Objects;
  * @author qiuyj
  * @since 2020-03-05
  */
-class NioRpcConnection implements RpcConnection {
+class NioRpcConnection extends AbstractRpcConnection {
 
     private static final InternalLogger LOG = InternalLoggerFactory.getLogger(NioRpcConnection.class);
 
@@ -107,20 +107,15 @@ class NioRpcConnection implements RpcConnection {
     }
 
     @Override
-    public void sendMessage(Object message) {
-        // todo 将要发送的对象序列化成字节数组
-        byte[] messageBytes = null;
-        ByteBuffer sendBytes = ByteBuffer.allocateDirect(messageBytes.length);
-        sendBytes.put(messageBytes);
+    protected void internalSendMessage(byte[] sendBytes) throws IOException {
+        ByteBuffer sendBuf = ByteBuffer.allocateDirect(sendBytes.length);
+        sendBuf.put(sendBytes);
         try {
-            socketChannel.write(sendBytes);
-        }
-        catch (IOException e) {
-            e.printStackTrace();
+            socketChannel.write(sendBuf);
         }
         finally {
             // 清理分配的directBuffer
-            UnsafeAccess.getUnsafe().invokeCleaner(sendBytes);
+            UnsafeAccess.getUnsafe().invokeCleaner(sendBuf);
         }
     }
 

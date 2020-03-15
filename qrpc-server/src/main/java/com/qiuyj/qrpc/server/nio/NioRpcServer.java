@@ -26,7 +26,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -56,6 +55,7 @@ public class NioRpcServer extends RpcServer {
      * 专门用于处理IO操作的线程池（coreNums * 2）
      */
     private ExecutorService workerPool;
+    private AtomicInteger workerPoolThreadCount = new AtomicInteger();
 
     public NioRpcServer(RpcServerConfig config, ServiceDescriptorContainer serviceDescriptorContainer) {
         super(config, serviceDescriptorContainer);
@@ -144,21 +144,17 @@ public class NioRpcServer extends RpcServer {
                 0L,
                 TimeUnit.MILLISECONDS,
                 new LinkedBlockingQueue<>(Math.max(workerNums, 64)),
-                new ThreadFactory() {
+                r -> new QrpcThread(r, "NioWorker-" + workerPoolThreadCount.incrementAndGet()));
+    }
 
-                    private AtomicInteger threadCount = new AtomicInteger(1);
-
-                    @Override
-                    public Thread newThread(Runnable r) {
-                        return new QrpcThread("NioWorker-" + threadCount.getAndIncrement()) {
-
-                            @Override
-                            public void run() {
-                                r.run();
-                            }
-                        };
-                    }
-                });
+    @Override
+    public InetSocketAddress getLocalAddress() {
+        try {
+            return (InetSocketAddress) ss.getLocalAddress();
+        }
+        catch (IOException e) {
+            return null;
+        }
     }
 
     private abstract static class AbstractSelectorThread extends QrpcThread {
@@ -225,7 +221,7 @@ public class NioRpcServer extends RpcServer {
         private SelectionKey acceptSk;
 
         private AcceptThread(List<SelectThread> selectThreads) {
-            super("NIO-Accept");
+            super("NioAccept");
             this.selectThreads = Collections.unmodifiableList(selectThreads);
         }
 
@@ -336,7 +332,7 @@ public class NioRpcServer extends RpcServer {
         private Queue<SocketChannel> acceptSocketChannelQueue = new ConcurrentLinkedQueue<>();
 
         private SelectThread(int i) {
-            super("NIO-Select-" + i);
+            super("NioSelect-" + i);
         }
 
         @Override
@@ -384,23 +380,21 @@ public class NioRpcServer extends RpcServer {
                 throw new IllegalStateException("Not an NioRpcConnection: " + attachment);
             }
             NioRpcConnection conn = (NioRpcConnection) attachment;
-            if (!conn.isOpen()) {
-                LOG.warn("NioRpcConnection has been closed, and ignore current IO handle");
-                return;
+            if (conn.isOpen()) {
+                // TODO 对连接做一些必要的设置
+                // 将io处理任务提交到worker线程
+                workerPool.execute(() -> {
+                    try {
+                        conn.handlIO(SelectThread.this);
+                    }
+                    catch (IOException e) {
+                        // 抛出IO异常，一般是客户端被动关闭了channel（比如强制kill客户端的进程）
+                        // 此时，服务器端也要同步关闭掉和客户端连接的channel
+                        conn.closeQuietly();
+                        LOG.error("Unexpected IO exception while handle reading or writing operations", e);
+                    }
+                });
             }
-            // TODO 对连接做一些必要的设置
-            // 将io处理任务提交到worker线程
-            workerPool.execute(() -> {
-                try {
-                    conn.handlIO(SelectThread.this);
-                }
-                catch (IOException e) {
-                    // 抛出IO异常，一般是客户端被动关闭了channel（比如强制kill客户端的进程）
-                    // 此时，服务器端也要同步关闭掉和客户端连接的channel
-                    conn.closeQuietly();
-                    LOG.error("Unexpected IO exception while handle reading or writing operations", e);
-                }
-            });
         }
 
         private void processAcceptSocketChannel() {

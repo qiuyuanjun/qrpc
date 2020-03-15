@@ -13,7 +13,7 @@ public interface RpcConnection {
      * 发送消息
      * @param message 消息内容
      */
-    void sendMessage(Object message);
+    void sendMessage(Object message) throws IOException;
 
     /**
      * 当前连接是否打开

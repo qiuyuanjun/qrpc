@@ -7,17 +7,18 @@ import com.qiuyj.qrpc.logger.InternalLoggerFactory;
  * @author qiuyj
  * @since 2020-03-03
  */
-public abstract class QrpcThread extends Thread {
+public class QrpcThread extends Thread {
 
     private static final InternalLogger LOG = InternalLoggerFactory.getLogger(QrpcThread.class);
 
     public QrpcThread(String name) {
-        super("QrpcThread-" + name);
-        setUncaughtExceptionHandler(this::handleException);
+        this(null, name);
     }
 
-    @Override
-    public abstract void run();
+    public QrpcThread(Runnable target, String name) {
+        super(target, "QrpcThread-" + name);
+        setUncaughtExceptionHandler(this::handleException);
+    }
 
     protected void handleException(Thread t, Throwable e) {
         LOG.error("Exception occurred from thread " + t.getName(), e);

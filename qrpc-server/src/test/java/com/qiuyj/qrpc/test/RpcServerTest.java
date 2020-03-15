@@ -12,6 +12,5 @@ public class RpcServerTest {
     public static void main(String[] args) {
         RpcServer server = RpcServerFactory.createDefault();
         server.start();
-        System.out.println(server.isRunning());
     }
 }
