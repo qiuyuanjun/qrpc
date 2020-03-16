@@ -1,4 +1,4 @@
-package com.qiuyj.qrpc.message;
+package com.qiuyj.qrpc.message.payload;
 
 import com.qiuyj.qrpc.QrpcException;
 

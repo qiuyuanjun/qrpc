@@ -14,19 +14,20 @@ import java.util.Set;
  * @author qiuyj
  * @since 2020-03-15
  */
-public class MessageHeader implements Serializable {
+public class MessageHeaders implements Serializable {
 
     private final Map<String, Object> headers;
 
-    public MessageHeader() {
+    public MessageHeaders() {
         this(new HashMap<>());
     }
 
-    public MessageHeader(Map<String, Object> headers) {
+    public MessageHeaders(Map<String, Object> headers) {
         this.headers = headers;
         if (!headers.isEmpty()) {
             headers.keySet().forEach(this::checkSystemDefinedHeaderKey);
         }
+        addHeader(KEY_TIMESTAMP, System.currentTimeMillis(), true);
     }
 
     public Object getHeader(String key) {
@@ -46,16 +47,27 @@ public class MessageHeader implements Serializable {
     }
 
     public void addHeader(String key, Object value) {
+        addHeader(key, value, false);
+    }
+
+    private void addHeader(String key, Object value, boolean internal) {
         if (StringUtils.isEmpty(key)) {
             throw new IllegalArgumentException("Header key can not be null or empty");
         }
-        checkSystemDefinedHeaderKey(key);
+        if (!internal) {
+            checkSystemDefinedHeaderKey(key);
+        }
         if (Objects.isNull(value)) {
             headers.remove(key);
         }
         else {
             headers.put(key, value);
         }
+    }
+
+    public boolean isAsync() {
+        Boolean async = getHeader(KEY_ASYNC, Boolean.class);
+        return Boolean.TRUE.equals(async);
     }
 
     /**
@@ -75,8 +87,11 @@ public class MessageHeader implements Serializable {
      */
     public static final String KEY_ASYNC = "async";
 
+    public static final String KEY_TIMESTAMP = "timestamp";
+
     static {
         SYSTEM_DEFINED_HEADER_KEYS = new HashSet<>();
         SYSTEM_DEFINED_HEADER_KEYS.add(KEY_ASYNC);
+        SYSTEM_DEFINED_HEADER_KEYS.add(KEY_TIMESTAMP);
     }
 }

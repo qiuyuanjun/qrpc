@@ -4,6 +4,8 @@ import com.qiuyj.qrpc.QrpcThread;
 import com.qiuyj.qrpc.cnxn.RpcConnection;
 import com.qiuyj.qrpc.logger.InternalLogger;
 import com.qiuyj.qrpc.logger.InternalLoggerFactory;
+import com.qiuyj.qrpc.message.converter.MessageConverterRegistrar;
+import com.qiuyj.qrpc.message.MessageConverters;
 import com.qiuyj.qrpc.service.ServiceDescriptor;
 import com.qiuyj.qrpc.service.ServiceDescriptorContainer;
 import com.qiuyj.qrpc.service.ServiceRegistrar;
@@ -26,7 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author qiuyj
  * @since 2020-02-29
  */
-public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
+public abstract class RpcServer implements Lifecycle, ServiceRegistrar, MessageConverterRegistrar {
 
     private static final InternalLogger LOG = InternalLoggerFactory.getLogger(RpcServer.class);
 
@@ -48,13 +50,21 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
      */
     private List<RpcConnection> connections = new LinkedList<>();
 
-    protected RpcServer(RpcServerConfig config, ServiceDescriptorContainer serviceDescriptorContainer) {
+    /**
+     * 消息转换器
+     */
+    private MessageConverters messageConverters;
+
+    protected RpcServer(RpcServerConfig config,
+                        ServiceDescriptorContainer serviceDescriptorContainer,
+                        MessageConverters messageConverters) {
         this.config = config;
         this.serviceDescriptorContainer = serviceDescriptorContainer;
         if (config.isEnableServiceRegistration()) {
             asyncServiceRegistrationUnregistrationQueue =
                     new LinkedBlockingQueue<>(config.getAsyncServiceRegistrationUnregistrationQueueSize());
         }
+        this.messageConverters = messageConverters;
     }
 
     public void configure(RpcServerConfig serverConfig) {

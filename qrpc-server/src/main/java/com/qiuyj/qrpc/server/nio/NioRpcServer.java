@@ -4,6 +4,7 @@ import com.qiuyj.qrpc.QrpcThread;
 import com.qiuyj.qrpc.cnxn.RpcConnection;
 import com.qiuyj.qrpc.logger.InternalLogger;
 import com.qiuyj.qrpc.logger.InternalLoggerFactory;
+import com.qiuyj.qrpc.message.MessageConverters;
 import com.qiuyj.qrpc.server.RpcServer;
 import com.qiuyj.qrpc.server.RpcServerConfig;
 import com.qiuyj.qrpc.service.ServiceDescriptorContainer;
@@ -57,8 +58,10 @@ public class NioRpcServer extends RpcServer {
     private ExecutorService workerPool;
     private AtomicInteger workerPoolThreadCount = new AtomicInteger();
 
-    public NioRpcServer(RpcServerConfig config, ServiceDescriptorContainer serviceDescriptorContainer) {
-        super(config, serviceDescriptorContainer);
+    public NioRpcServer(RpcServerConfig config,
+                        ServiceDescriptorContainer serviceDescriptorContainer,
+                        MessageConverters messageConverters) {
+        super(config, serviceDescriptorContainer, messageConverters);
     }
 
     @Override

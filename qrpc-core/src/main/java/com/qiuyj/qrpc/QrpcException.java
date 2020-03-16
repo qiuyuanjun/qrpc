@@ -18,6 +18,16 @@ public class QrpcException extends RuntimeException {
     public static final int ERR_CODE_CAUGHT_EXCEPTION_UNHANDLER = 2;
 
     /**
+     * 未知的消息类型
+     */
+    public static final int ERR_CODE_UNKNOWN_MESSAGE_TYPE = 3;
+
+    /**
+     * 消息有问题，不符合定义的消息
+     */
+    public static final int ERR_CODE_BAD_MESSAGE = 4;
+
+  /**
      * 错误码
      */
     private final int errorCode;

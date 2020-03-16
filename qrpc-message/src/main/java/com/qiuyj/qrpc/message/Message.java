@@ -1,5 +1,8 @@
 package com.qiuyj.qrpc.message;
 
+import com.qiuyj.qrpc.message.payload.RpcRequest;
+import com.qiuyj.qrpc.message.payload.RpcResult;
+
 import java.io.Serializable;
 import java.util.Map;
 
@@ -13,27 +16,29 @@ public class Message implements Serializable {
     /**
      * 消息头信息
      */
-    private MessageHeader header;
+    private MessageHeaders messageHeaders;
 
     /**
-     * 请求对象，当messageType为REQUEST_TYPE的时候有值
+     * 消息体，可以使{@link RpcRequest}对象或者是{@link RpcResult}对象
      */
-    private RpcRequest requestMessage;
-
-    /**
-     * 结果相应对象，当messageType为RESULT_TYPE的时候有值
-     */
-    private RpcResult resultMessage;
+    private Object messagePayload;
 
     /**
      * 附加信息对象
      */
-    private Map<Object, Object> attachment;
+    private Map<Object, Object> attachments;
 
-    public enum MessageType {
+    public RpcRequest asRequestPayload() {
+        if (!(messagePayload instanceof RpcRequest)) {
+            throw new UnknownMessageTypeException("Not an RpcRequest message");
+        }
+        return (RpcRequest) messagePayload;
+    }
 
-        REQUEST_TYPE,
-
-        RESULT_TYPE
+    public RpcResult asResultPayload() {
+        if (!(messagePayload instanceof RpcResult)) {
+            throw new UnknownMessageTypeException("Not an RpcResult message");
+        }
+        return (RpcResult) messagePayload;
     }
 }
