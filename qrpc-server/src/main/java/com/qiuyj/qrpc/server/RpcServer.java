@@ -167,9 +167,9 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
 
     private void multiRegisterToServiceRegistrationIfNecessary(List<ServiceDescriptor> serviceDescriptors) {
         if (config.isEnableServiceRegistration() && isRunning() && !serviceDescriptors.isEmpty()) {
-            Partition<ServiceDescriptor> serviceProxyPartition = new Partition<>(serviceDescriptors);
-            while (serviceProxyPartition.hasNext()) {
-                List<ServiceDescriptor> sub = serviceProxyPartition.next();
+            Partition<ServiceDescriptor> sdPartition = new Partition<>(serviceDescriptors);
+            while (sdPartition.hasNext()) {
+                List<ServiceDescriptor> sub = sdPartition.next();
                 if (!asyncServiceRegistrationUnregistrationQueue.offer(new RegistrationUnregistrationInfo(sub, true))) {
                     // 此时，注册队列已经满了，那么注册失败，移除之前注册的所有服务
                     unregisterAll(serviceDescriptors, false);
@@ -219,9 +219,9 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar {
 
     private void multiUnregisterFromServiceRegistrationIfNecessary(List<ServiceDescriptor> serviceDescriptors) {
         if (config.isEnableServiceRegistration() && !serviceDescriptors.isEmpty()) {
-            Partition<ServiceDescriptor> serviceProxyPartition = new Partition<>(serviceDescriptors);
-            while (serviceProxyPartition.hasNext()) {
-                List<ServiceDescriptor> sub = serviceProxyPartition.next();
+            Partition<ServiceDescriptor> sdPartition = new Partition<>(serviceDescriptors);
+            while (sdPartition.hasNext()) {
+                List<ServiceDescriptor> sub = sdPartition.next();
                 if (!asyncServiceRegistrationUnregistrationQueue.offer(new RegistrationUnregistrationInfo(sub, false))) {
                     throw new IllegalStateException("asyncServiceRegistrationUnregistrationQueue has been fulled");
                 }
