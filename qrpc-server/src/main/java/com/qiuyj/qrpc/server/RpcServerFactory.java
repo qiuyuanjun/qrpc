@@ -19,8 +19,20 @@ public abstract class RpcServerFactory {
 
     private static final Class<?>[] RPC_SERVER_CLASS_CONSTRUCTOR_ARGS = { RpcServerConfig.class, ServiceDescriptorContainer.class };
 
-    private RpcServerFactory() {
-        // for private
+    public RpcServerFactory() {
+        // empty
+    }
+
+    /**
+     * 创建rpc服务器实例
+     */
+    public abstract RpcServer newInstance();
+
+    /**
+     * 创建默认的{@link DefaultRpcServerFactory}对象
+     */
+    public static RpcServerFactory defaultFactory() {
+        return new DefaultRpcServerFactory();
     }
 
     /**
@@ -51,6 +63,14 @@ public abstract class RpcServerFactory {
         }
         catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
             throw new IllegalStateException("Error instantiating constructor", e);
+        }
+    }
+
+    private static class DefaultRpcServerFactory extends RpcServerFactory {
+
+        @Override
+        public RpcServer newInstance() {
+            return createDefault();
         }
     }
 
