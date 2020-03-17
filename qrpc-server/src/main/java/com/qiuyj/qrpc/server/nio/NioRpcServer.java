@@ -369,7 +369,7 @@ public class NioRpcServer extends RpcServer {
                 }
                 else if (sk.isReadable() || sk.isWritable()) {
                     // 处理io操作
-                    handlIO(sk);
+                    handleIO(sk);
                 }
                 else {
                     LOG.warn("The current SelectionKey: {} is not READ or WRITE ops", sk);
@@ -377,7 +377,7 @@ public class NioRpcServer extends RpcServer {
             }
         }
 
-        private void handlIO(SelectionKey sk) {
+        private void handleIO(SelectionKey sk) {
             RpcConnection attachment = (RpcConnection) sk.attachment();
             if (!(attachment instanceof NioRpcConnection)) {
                 throw new IllegalStateException("Not an NioRpcConnection: " + attachment);
@@ -388,7 +388,7 @@ public class NioRpcServer extends RpcServer {
                 // 将io处理任务提交到worker线程
                 workerPool.execute(() -> {
                     try {
-                        conn.handlIO(SelectThread.this);
+                        conn.handleIO(SelectThread.this);
                     }
                     catch (IOException e) {
                         // 抛出IO异常，一般是客户端被动关闭了channel（比如强制kill客户端的进程）

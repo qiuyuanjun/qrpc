@@ -44,7 +44,7 @@ class NioRpcConnection extends AbstractRpcConnection {
      * 处理io任务（包括从客户端读取数据，以及向客户端写入数据）
      * @param selectThread 当前操作所在的{@code SelectThread}
      */
-    void handlIO(NioRpcServer.SelectThread selectThread) throws IOException {
+    void handleIO(NioRpcServer.SelectThread selectThread) throws IOException {
         if (!isOpen()) {
             return;
         }
