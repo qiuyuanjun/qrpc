@@ -11,6 +11,8 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.MessageToByteEncoder;
 
+import java.util.concurrent.CountDownLatch;
+
 /**
  * @author qiuyj
  * @since 2020-03-14
@@ -39,11 +41,13 @@ public class RpcClientTest {
                     }
                 });
         ChannelFuture f = b.connect("127.0.0.1", 11221).syncUninterruptibly();
+        CountDownLatch countDownLatch = new CountDownLatch(1000);
         for (int i = 1; i <= 1000; i++) {
-            f.channel().writeAndFlush("Hello rpc server, this is rpc client's message of seria number: " + i);
-            Thread.sleep(10);
+            f.channel().writeAndFlush("Hello rpc server, this is rpc client's message of seria number: " + i)
+                    .addListener(future -> countDownLatch.countDown());
         }
-        f.channel().close();
+        countDownLatch.await();
         b.config().group().shutdownGracefully();
+        f.channel().close();
     }
 }

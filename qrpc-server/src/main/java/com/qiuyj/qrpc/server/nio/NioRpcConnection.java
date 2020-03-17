@@ -35,6 +35,11 @@ class NioRpcConnection extends AbstractRpcConnection {
      */
     private ByteBuffer messageBody;
 
+    /**
+     * 从channel里面读取数据时候所需要加的锁
+     */
+    private final Object readMessageLock = new Object();
+
     NioRpcConnection(SelectionKey selectionKey) {
         this.selectionKey = selectionKey;
         this.socketChannel = (SocketChannel) selectionKey.channel();
@@ -50,7 +55,7 @@ class NioRpcConnection extends AbstractRpcConnection {
         }
         if (selectionKey.isReadable()) {
             byte[] recvBytes = null;
-            synchronized (socketChannel) {
+            synchronized (readMessageLock) {
                 int len = -1;
                 try {
                     if (Objects.nonNull(messageBody)) {

@@ -126,6 +126,16 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
                 bytes[offset + 2] = (byte) ((val >>> 8) & 0xFF);
                 bytes[offset + 3] = (byte) (val & 0xFF);
             }
+
+            @Override
+            byte[] getBytes(int val) {
+                return new byte[] {
+                        (byte) ((val >>> 24) & 0xFF),
+                        (byte) ((val >>> 16) & 0xFF),
+                        (byte) ((val >>> 8) & 0xFF),
+                        (byte) (val & 0xFF)
+                };
+            }
         },
 
         /**
@@ -148,11 +158,23 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
                 bytes[offset + 2] = (byte) ((val >>> 16) & 0xFF);
                 bytes[offset + 3] = (byte) ((val >>> 24) & 0xFF);
             }
+
+            @Override
+            byte[] getBytes(int val) {
+                return new byte[] {
+                        (byte) (val & 0xFF),
+                        (byte) ((val >>> 8) & 0xFF),
+                        (byte) ((val >>> 16) & 0xFF),
+                        (byte) ((val >>> 24) & 0xFF)
+                };
+            }
         };
 
         abstract int getInt(byte[] bytes, int offset);
 
         abstract void putInt(byte[] bytes, int val, int offset);
+
+        abstract byte[] getBytes(int val);
 
         /**
          * 获取当前平台的字节序
@@ -170,19 +192,11 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
         }
 
         private static int genMagic(int magic) {
-            if (platform() == BIG_ENDIAN) {
-                return magic;  // 如果当前系统也是大端方式，那么直接返回
-            }
-            else {
-                // 系统使用的是小端方式，那么需要将其转换为大端方式
-                byte[] bytes = {
-                        (byte) (magic >>> 24 & 0xFF),
-                        (byte) ((magic >>> 16) & 0xFF),
-                        (byte) ((magic >>> 8) & 0xFF),
-                        (byte) ((magic) & 0xFF)
-                };
-                return BIG_ENDIAN.getInt(bytes, 0);
-            }
+            // 如果当前系统使用的是大端方式，那么直接返回
+            // 如果当前系统使用的是小端方式，那么需要将其转换为大端方式
+            return platform() == BIG_ENDIAN
+                    ? magic
+                    : BIG_ENDIAN.getInt(BIG_ENDIAN.getBytes(magic), 0);
         }
     }
 
