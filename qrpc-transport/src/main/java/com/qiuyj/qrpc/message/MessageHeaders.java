@@ -89,9 +89,19 @@ public class MessageHeaders implements Serializable {
 
     public static final String KEY_TIMESTAMP = "timestamp";
 
+    public static final String KEY_CONVERTER_TYPE = "converterType";
+
     static {
         SYSTEM_DEFINED_HEADER_KEYS = new HashSet<>();
         SYSTEM_DEFINED_HEADER_KEYS.add(KEY_ASYNC);
         SYSTEM_DEFINED_HEADER_KEYS.add(KEY_TIMESTAMP);
+        SYSTEM_DEFINED_HEADER_KEYS.add(KEY_CONVERTER_TYPE);
+    }
+
+    /**
+     * @apiNote 仅供内部调用
+     */
+    Object removeConverterTypeHeader() {
+        return headers.remove(MessageHeaders.KEY_CONVERTER_TYPE);
     }
 }

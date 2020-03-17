@@ -4,6 +4,7 @@ import com.qiuyj.qrpc.QrpcThread;
 import com.qiuyj.qrpc.cnxn.RpcConnection;
 import com.qiuyj.qrpc.logger.InternalLogger;
 import com.qiuyj.qrpc.logger.InternalLoggerFactory;
+import com.qiuyj.qrpc.message.converter.MessageConverter;
 import com.qiuyj.qrpc.message.converter.MessageConverterRegistrar;
 import com.qiuyj.qrpc.message.MessageConverters;
 import com.qiuyj.qrpc.service.ServiceDescriptor;
@@ -53,18 +54,15 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar, MessageC
     /**
      * 消息转换器
      */
-    private MessageConverters messageConverters;
+    private MessageConverters messageConverters = new MessageConverters();
 
-    protected RpcServer(RpcServerConfig config,
-                        ServiceDescriptorContainer serviceDescriptorContainer,
-                        MessageConverters messageConverters) {
+    protected RpcServer(RpcServerConfig config, ServiceDescriptorContainer serviceDescriptorContainer) {
         this.config = config;
         this.serviceDescriptorContainer = serviceDescriptorContainer;
         if (config.isEnableServiceRegistration()) {
             asyncServiceRegistrationUnregistrationQueue =
                     new LinkedBlockingQueue<>(config.getAsyncServiceRegistrationUnregistrationQueueSize());
         }
-        this.messageConverters = messageConverters;
     }
 
     public void configure(RpcServerConfig serverConfig) {
@@ -118,6 +116,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar, MessageC
             asyncServiceRegistrationUnregistrationQueue.clear();
         }
         serviceDescriptorContainer.clear();
+        MessageConverters.reset();
     }
 
     @Override
@@ -272,7 +271,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar, MessageC
                     continue;
                 }
                 List<ServiceDescriptor> serviceDescriptors = info.serviceDescriptors;
-                if (info.regist) {
+                if (info.register) {
                     // 注册服务
 
                 }
@@ -285,13 +284,36 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar, MessageC
 
     private static class RegistrationUnregistrationInfo {
 
-        private boolean regist;
+        private boolean register;
 
         private List<ServiceDescriptor> serviceDescriptors;
 
-        private RegistrationUnregistrationInfo(List<ServiceDescriptor> serviceDescriptors, boolean regist) {
+        private RegistrationUnregistrationInfo(List<ServiceDescriptor> serviceDescriptors, boolean register) {
             this.serviceDescriptors = serviceDescriptors;
-            this.regist = regist;
+            this.register = register;
+        }
+    }
+
+    //--------------------------------MessageConverterRegistrar
+
+    @Override
+    public void addConverter(MessageConverter messageConverter) {
+        if (Objects.isNull(messageConverter)) {
+            LOG.warn("The messageConverter to be added is null, ignore this action");
+        }
+        else {
+            messageConverters.addConverter(messageConverter);
+        }
+    }
+
+    @Override
+    public MessageConverter replaceConverter(MessageConverter messageConverter) {
+        if (Objects.isNull(messageConverter)) {
+            LOG.warn("The messageConverter to be replaced is null, ignore this action");
+            return null;
+        }
+        else {
+            return messageConverters.replaceConverter(messageConverter);
         }
     }
 }

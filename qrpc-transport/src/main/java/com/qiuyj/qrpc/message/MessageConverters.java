@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentMap;
  */
 public class MessageConverters implements MessageConverter, MessageConverterRegistrar {
 
-    private static final int MESSAGE_MAGIC = 0x19961122;
+    private static final int MESSAGE_MAGIC = ByteOrder.genMagic(0x19961122);
 
     /**
      * 所有注册的转换器
@@ -28,6 +28,10 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
      */
     private static AbstractMessageConverter defaultMessageConverter;
 
+    /**
+     * 设置默认的消息转换器，在服务器启动范围之内，只能设置一次
+     * @param defaultMessageConverter 默认的消息转换器
+     */
     public static void setDefaultMessageConverter(MessageConverter defaultMessageConverter) {
         if (Objects.nonNull(MessageConverters.defaultMessageConverter)) {
             throw new IllegalStateException("The defaultMessageConverter has already exist");
@@ -35,7 +39,20 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
         if (!(defaultMessageConverter instanceof AbstractMessageConverter)) {
             throw new IllegalArgumentException("Not an AbstractMessageConverter subclass");
         }
-        MessageConverters.defaultMessageConverter = (AbstractMessageConverter) defaultMessageConverter;
+        Integer type = checkMessageConverterType(defaultMessageConverter);
+        messageConverterMap.putIfAbsent(type,
+                (MessageConverters.defaultMessageConverter = (AbstractMessageConverter) defaultMessageConverter));
+    }
+
+    private static Integer checkMessageConverterType(MessageConverter messageConverter) {
+        Integer type = messageConverter.type();
+        if (Objects.isNull(type)) {
+            throw new IllegalStateException("The message converter's type must not be null");
+        }
+        if (type > 0xFF || type < 0x00) {
+            throw new IllegalStateException("Type value out of bound, must be in the range of [0x00, 0xff]");
+        }
+        return type;
     }
 
     @Override
@@ -50,7 +67,7 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
             throw new BadMessageException("Message bytes' length must gte 6");
         }
         // 读取前面4个字节（魔数）
-        int magic = ByteOrder.platformReversed().getInt(bytes, 0);
+        int magic = ByteOrder.BIG_ENDIAN.getInt(bytes, 0);
         if (magic != MESSAGE_MAGIC) {
             throw new BadMessageException("Message's magic number is wrong");
         }
@@ -60,7 +77,7 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
             converter = defaultMessageConverter;
             if (Objects.isNull(converter)) {
                 // 抛出异常
-                throw new UnknownMessageTypeException("Can not find out message converter to decode this message");
+                throw new UnknownMessageTypeException("Can not find out the message converter to decode this message");
             }
         }
         return converter.toMessage(bytes);
@@ -73,7 +90,14 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
     }
 
     private static MessageConverter getMessageConverter(Message message) {
-        return defaultMessageConverter;
+        Object type = message.messageHeaders.removeConverterTypeHeader();
+        MessageConverter converter = type instanceof Integer
+                ? messageConverterMap.get(type)
+                : defaultMessageConverter;
+        if (Objects.isNull(converter)) {
+            throw new UnknownMessageTypeException("Can not find out the message converter to encode this message");
+        }
+        return converter;
     }
 
     public static Integer getConverterType(Message message) {
@@ -131,24 +155,74 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
         abstract void putInt(byte[] bytes, int val, int offset);
 
         /**
-         * 获取和平台相反的字节序
+         * 获取当前平台的字节序
          */
-        private static ByteOrder platformReversed() {
+        private static ByteOrder platform() {
             long l = 0x0102030405060708L;
             switch ((byte) l) {
                 case 0x01: // 表明系统是大端方式
-                    return LITTLE_ENDIAN;
-                case 0x08: // 表明系统是小端方式
                     return BIG_ENDIAN;
+                case 0x08: // 表明系统是小端方式
+                    return LITTLE_ENDIAN;
                 default:
                     return BIG_ENDIAN;
             }
         }
+
+        private static int genMagic(int magic) {
+            if (platform() == BIG_ENDIAN) {
+                return magic;  // 如果当前系统也是大端方式，那么直接返回
+            }
+            else {
+                // 系统使用的是小端方式，那么需要将其转换为大端方式
+                byte[] bytes = {
+                        (byte) (magic & 0xFF),
+                        (byte) ((magic >>> 8) & 0xFF),
+                        (byte) ((magic >>> 16) & 0xFF),
+                        (byte) ((magic >>> 24) & 0xFF)
+                };
+                return BIG_ENDIAN.getInt(bytes, 0);
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        int magic = 0x19961122;
+        System.out.println(magic);
+        System.out.println(ByteOrder.genMagic(magic));
     }
 
     public static void writeMagic(ByteArrayOutputStream bytes) throws IOException {
         byte[] magic = new byte[4]; // 魔数4个字节
-        ByteOrder.platformReversed().putInt(magic, MESSAGE_MAGIC, 0);
+        // 默认使用大端方式编码magic
+        ByteOrder.BIG_ENDIAN.putInt(magic, MESSAGE_MAGIC, 0);
         bytes.write(magic);
+    }
+
+    public static void reset() {
+        messageConverterMap.clear();
+        defaultMessageConverter = null;
+    }
+
+    @Override
+    public void addConverter(MessageConverter messageConverter) {
+        if (!(messageConverter instanceof AbstractMessageConverter)) {
+            throw new IllegalArgumentException("Not an AbstractMessageConverter subclass");
+        }
+        Integer type = checkMessageConverterType(messageConverter);
+        AbstractMessageConverter shouldBeNull =
+                messageConverterMap.putIfAbsent(type, (AbstractMessageConverter) messageConverter);
+        if (Objects.nonNull(shouldBeNull)) {
+            throw new IllegalStateException("MessageConverter's type: " + type + " already exist");
+        }
+    }
+
+    @Override
+    public MessageConverter replaceConverter(MessageConverter messageConverter) {
+        if (!(messageConverter instanceof AbstractMessageConverter)) {
+            throw new IllegalArgumentException("Not an AbstractMessageConverter subclass");
+        }
+        Integer type = checkMessageConverterType(messageConverter);
+        return messageConverterMap.replace(type, (AbstractMessageConverter) messageConverter);
     }
 }

@@ -16,7 +16,7 @@ public class Message implements Serializable {
     /**
      * 消息头信息
      */
-    private MessageHeaders messageHeaders;
+    MessageHeaders messageHeaders;
 
     /**
      * 消息体，可以使{@link RpcRequest}对象或者是{@link RpcResult}对象

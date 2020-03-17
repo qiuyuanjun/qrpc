@@ -8,6 +8,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 /**
+ * 所有自定义的{@code MessageConverter}都应该继承该类
  * @author qiuyj
  * @since 2020-03-16
  */

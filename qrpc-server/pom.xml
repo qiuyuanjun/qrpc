@@ -19,7 +19,7 @@
         </dependency>
         <dependency>
             <groupId>com.qiuyj</groupId>
-            <artifactId>qrpc-message</artifactId>
+            <artifactId>qrpc-transport</artifactId>
         </dependency>
 
         <dependency>

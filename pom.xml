@@ -14,7 +14,7 @@
         <module>qrpc-log</module>
         <module>qrpc-core</module>
         <module>qrpc-spring</module>
-        <module>qrpc-message</module>
+        <module>qrpc-transport</module>
     </modules>
 
     <properties>
@@ -56,7 +56,7 @@
             </dependency>
             <dependency>
                 <groupId>com.qiuyj</groupId>
-                <artifactId>qrpc-message</artifactId>
+                <artifactId>qrpc-transport</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
