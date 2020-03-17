@@ -176,20 +176,14 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
             else {
                 // 系统使用的是小端方式，那么需要将其转换为大端方式
                 byte[] bytes = {
-                        (byte) (magic & 0xFF),
-                        (byte) ((magic >>> 8) & 0xFF),
+                        (byte) (magic >>> 24 & 0xFF),
                         (byte) ((magic >>> 16) & 0xFF),
-                        (byte) ((magic >>> 24) & 0xFF)
+                        (byte) ((magic >>> 8) & 0xFF),
+                        (byte) ((magic) & 0xFF)
                 };
                 return BIG_ENDIAN.getInt(bytes, 0);
             }
         }
-    }
-
-    public static void main(String[] args) {
-        int magic = 0x19961122;
-        System.out.println(magic);
-        System.out.println(ByteOrder.genMagic(magic));
     }
 
     public static void writeMagic(ByteArrayOutputStream bytes) throws IOException {
