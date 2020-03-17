@@ -4,6 +4,8 @@ import com.qiuyj.qrpc.message.converter.AbstractMessageConverter;
 import com.qiuyj.qrpc.message.converter.MessageConverter;
 import com.qiuyj.qrpc.message.converter.MessageConverterRegistrar;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -19,18 +21,21 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
     /**
      * 所有注册的转换器
      */
-    private ConcurrentMap<Integer, AbstractMessageConverter> messageConverterMap = new ConcurrentHashMap<>();
+    private static ConcurrentMap<Integer, AbstractMessageConverter> messageConverterMap = new ConcurrentHashMap<>();
 
     /**
      * 默认的消息转换器，当如果无法从请求报文里面获取到对应的消息转换器的时候，使用该默认的转换器
      */
-    private AbstractMessageConverter defaultMessageConverter;
+    private static AbstractMessageConverter defaultMessageConverter;
 
-    public void setDefaultMessageConverter(MessageConverter defaultMessageConverter) {
+    public static void setDefaultMessageConverter(MessageConverter defaultMessageConverter) {
+        if (Objects.nonNull(MessageConverters.defaultMessageConverter)) {
+            throw new IllegalStateException("The defaultMessageConverter has already exist");
+        }
         if (!(defaultMessageConverter instanceof AbstractMessageConverter)) {
             throw new IllegalArgumentException("Not an AbstractMessageConverter subclass");
         }
-        this.defaultMessageConverter = (AbstractMessageConverter) defaultMessageConverter;
+        MessageConverters.defaultMessageConverter = (AbstractMessageConverter) defaultMessageConverter;
     }
 
     @Override
@@ -39,7 +44,7 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
     }
 
     @Override
-    public Message toMessage(byte[] bytes) {
+    public Message toMessage(byte[] bytes) throws IOException {
         if (bytes.length < 6) {
             // 消息有问题
             throw new BadMessageException("Message bytes' length must gte 6");
@@ -49,7 +54,7 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
         if (magic != MESSAGE_MAGIC) {
             throw new BadMessageException("Message's magic number is wrong");
         }
-        MessageConverter converter = messageConverterMap.get((int) bytes[4]);
+        MessageConverter converter = messageConverterMap.get(bytes[4] & 0xFF);
         if (Objects.isNull(converter)) {
             // 找不到消息转换器，那么使用默认的消息转换器
             converter = defaultMessageConverter;
@@ -62,8 +67,17 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
     }
 
     @Override
-    public byte[] fromMessage(Message message) {
-        return new byte[0];
+    public byte[] fromMessage(Message message) throws IOException {
+        MessageConverter converter = getMessageConverter(message);
+        return converter.fromMessage(message);
+    }
+
+    private static MessageConverter getMessageConverter(Message message) {
+        return defaultMessageConverter;
+    }
+
+    public static Integer getConverterType(Message message) {
+        return getMessageConverter(message).type() & 0xFF;
     }
 
     private enum ByteOrder {
@@ -83,10 +97,10 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
 
             @Override
             void putInt(byte[] bytes, int val, int offset) {
-                bytes[offset] = (byte) (val >>> 24);
-                bytes[offset + 1] = (byte) (val >>> 16);
-                bytes[offset + 2] = (byte) (val >>> 8);
-                bytes[offset + 3] = (byte) val;
+                bytes[offset] = (byte) ((val >>> 24) & 0xFF);
+                bytes[offset + 1] = (byte) ((val >>> 16) & 0xFF);
+                bytes[offset + 2] = (byte) ((val >>> 8) & 0xFF);
+                bytes[offset + 3] = (byte) (val & 0xFF);
             }
         },
 
@@ -105,10 +119,10 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
 
             @Override
             void putInt(byte[] bytes, int val, int offset) {
-                bytes[offset] = (byte) val;
-                bytes[offset + 1] = (byte) (val >>> 8);
-                bytes[offset + 2] = (byte) (val >>> 16);
-                bytes[offset + 3] = (byte) (val >>> 24);
+                bytes[offset] = (byte) (val & 0xFF);
+                bytes[offset + 1] = (byte) ((val >>> 8) & 0xFF);
+                bytes[offset + 2] = (byte) ((val >>> 16) & 0xFF);
+                bytes[offset + 3] = (byte) ((val >>> 24) & 0xFF);
             }
         };
 
@@ -130,5 +144,11 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
                     return BIG_ENDIAN;
             }
         }
+    }
+
+    public static void writeMagic(ByteArrayOutputStream bytes) throws IOException {
+        byte[] magic = new byte[4]; // 魔数4个字节
+        ByteOrder.platformReversed().putInt(magic, MESSAGE_MAGIC, 0);
+        bytes.write(magic);
     }
 }
