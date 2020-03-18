@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentMap;
  */
 public class MessageConverters implements MessageConverter, MessageConverterRegistrar {
 
-    private static final int MESSAGE_MAGIC = ByteOrder.genMagic(0x19961122);
+    private static final int MESSAGE_MAGIC = 0x19961122;
 
     /**
      * 所有注册的转换器
@@ -67,7 +67,7 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
             throw new BadMessageException("Message bytes' length must gte 6");
         }
         // 读取前面4个字节（魔数）
-        int magic = ByteOrder.BIG_ENDIAN.getInt(bytes, 0);
+        int magic = ByteOrder.getMagicFromBytes(bytes, 0);
         if (magic != MESSAGE_MAGIC) {
             throw new BadMessageException("Message's magic number is wrong");
         }
@@ -113,10 +113,10 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
 
             @Override
             int getInt(byte[] bytes, int offset) {
-                return bytes[offset] << 24
-                        | bytes[offset + 1] << 16
-                        | bytes[offset + 2] << 8
-                        | bytes[offset + 3];
+                return (bytes[offset] << 24) & 0xFF000000
+                        | (bytes[offset + 1] << 16) & 0x00FF0000
+                        | (bytes[offset + 2] << 8) & 0x0000FF00
+                        | bytes[offset + 3] & 0xFF;
             }
 
             @Override
@@ -145,10 +145,10 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
 
             @Override
             int getInt(byte[] bytes, int offset) {
-                return bytes[offset + 3] << 24
-                        | bytes[offset + 2] << 16
-                        | bytes[offset + 1] << 8
-                        | bytes[offset];
+                return (bytes[offset + 3] << 24) & 0xFF000000
+                        | (bytes[offset + 2] << 16) & 0x00FF0000
+                        | (bytes[offset + 1] << 8) & 0x0000FF00
+                        | bytes[offset] & 0xFF;
             }
 
             @Override
@@ -179,6 +179,7 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
         /**
          * 获取当前平台的字节序
          */
+        @SuppressWarnings("unused")
         private static ByteOrder platform() {
             long l = 0x0102030405060708L;
             switch ((byte) l) {
@@ -191,19 +192,19 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
             }
         }
 
-        private static int genMagic(int magic) {
-            // 如果当前系统使用的是大端方式，那么直接返回
-            // 如果当前系统使用的是小端方式，那么需要将其转换为大端方式
-            return platform() == BIG_ENDIAN
-                    ? magic
-                    : BIG_ENDIAN.getInt(BIG_ENDIAN.getBytes(magic), 0);
+        private static int getMagicFromBytes(byte[] bytes, int offset) {
+            return BIG_ENDIAN.getInt(bytes, offset);
+        }
+
+        private static void putMagicToBytes(byte[] bytes, int val, int offset) {
+            BIG_ENDIAN.putInt(bytes, val, offset);
         }
     }
 
     public static void writeMagic(ByteArrayOutputStream bytes) throws IOException {
         byte[] magic = new byte[4]; // 魔数4个字节
         // 默认使用大端方式编码magic
-        ByteOrder.BIG_ENDIAN.putInt(magic, MESSAGE_MAGIC, 0);
+        ByteOrder.putMagicToBytes(magic, MESSAGE_MAGIC, 0);
         bytes.write(magic);
     }
 
