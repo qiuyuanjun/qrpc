@@ -52,9 +52,9 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar, MessageC
     private List<RpcConnection> connections = new LinkedList<>();
 
     /**
-     * 消息转换器
+     * 消息转换器，必须通过{@link #setMessageConverters(MessageConverters)}方法设置
      */
-    private MessageConverters messageConverters = new MessageConverters();
+    private MessageConverters messageConverters;
 
     protected RpcServer(RpcServerConfig config, ServiceDescriptorContainer serviceDescriptorContainer) {
         this.config = config;
@@ -74,6 +74,15 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar, MessageC
     }
 
     public abstract InetSocketAddress getLocalAddress();
+
+    public void setMessageConverters(MessageConverters messageConverters) {
+        this.messageConverters = Objects.requireNonNull(messageConverters, "messageConverters");
+    }
+
+    protected MessageConverters getMessageConverters() {
+        checkMessageConverters();
+        return messageConverters;
+    }
 
     //--------------------------------Lifecycle
 
@@ -116,7 +125,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar, MessageC
             asyncServiceRegistrationUnregistrationQueue.clear();
         }
         serviceDescriptorContainer.clear();
-        MessageConverters.reset();
+//        MessageConverters.reset();
     }
 
     @Override
@@ -296,8 +305,15 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar, MessageC
 
     //--------------------------------MessageConverterRegistrar
 
+    private void checkMessageConverters() {
+        if (Objects.isNull(messageConverters)) {
+            throw new IllegalStateException("The messageConverters is null, you may be invoke the setMessageConverters method before");
+        }
+    }
+
     @Override
     public void addConverter(MessageConverter messageConverter) {
+        checkMessageConverters();
         if (Objects.isNull(messageConverter)) {
             LOG.warn("The messageConverter to be added is null, ignore this action");
         }
@@ -308,6 +324,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar, MessageC
 
     @Override
     public MessageConverter replaceConverter(MessageConverter messageConverter) {
+        checkMessageConverters();
         if (Objects.isNull(messageConverter)) {
             LOG.warn("The messageConverter to be replaced is null, ignore this action");
             return null;

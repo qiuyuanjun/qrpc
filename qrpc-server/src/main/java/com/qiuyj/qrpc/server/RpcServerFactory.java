@@ -2,12 +2,15 @@ package com.qiuyj.qrpc.server;
 
 import com.qiuyj.qrpc.logger.InternalLogger;
 import com.qiuyj.qrpc.logger.InternalLoggerFactory;
+import com.qiuyj.qrpc.message.MessageConverters;
 import com.qiuyj.qrpc.service.DefaultServiceDescriptorContainer;
 import com.qiuyj.qrpc.service.ServiceDescriptorContainer;
 import com.qiuyj.qrpc.utils.ClassUtils;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.util.Objects;
 
 /**
  * @author qiuyj
@@ -18,6 +21,11 @@ public abstract class RpcServerFactory {
     static final InternalLogger LOG = InternalLoggerFactory.getLogger(RpcServerFactory.class);
 
     private static final Class<?>[] RPC_SERVER_CLASS_CONSTRUCTOR_ARGS = { RpcServerConfig.class, ServiceDescriptorContainer.class };
+
+    /**
+     * 共享的消息转换器，当一个jvm进程同时包含rpc服务器和客户端的时候，那么客户端和服务器共享消息转换器
+     */
+    public static volatile MessageConverters sharedMessageConverters;
 
     public RpcServerFactory() {
         // empty
@@ -48,9 +56,34 @@ public abstract class RpcServerFactory {
         ServiceDescriptorContainer sdContainer = new DefaultServiceDescriptorContainer(serverConfig.isIgnoreTypeMismatch());
         // 3、创建对应的服务器
         RpcServer rpcServer = newInstance(serverConfig, sdContainer);
-        // 4、配置rpcServer
+        // 4、设置消息转换器
+        rpcServer.setMessageConverters(getOrCreateMessageConverters());
+        // 5、配置rpcServer
         rpcServer.configure(serverConfig);
         return rpcServer;
+    }
+
+    private static MessageConverters getOrCreateMessageConverters() {
+        if (Objects.nonNull(sharedMessageConverters)) {
+            return sharedMessageConverters;
+        }
+        Class<?> clientFactoryClass = ClassUtils.resolveClass("com.qiuyj.qrpc.client.RpcClientFactory");
+        if (Objects.isNull(clientFactoryClass)) {
+            // 如果当前环境找不到{@code com.qiuyj.qrpc.client.RpcClientFactory}类的话，那么表明不存在客户端和服务器端同时存在的情况
+            return sharedMessageConverters = new MessageConverters();
+        }
+        // 找到sharedMessageConverters属性，看是否有值，如果有值，那么直接返回
+        Field f = ClassUtils.getDeclaredField(clientFactoryClass, "sharedMessageConverters");
+        try {
+            sharedMessageConverters = (MessageConverters) f.get(null);
+        }
+        catch (IllegalAccessException e) {
+            // ignore, never happen
+        }
+        if (Objects.isNull(sharedMessageConverters)) {
+            sharedMessageConverters = new MessageConverters();
+        }
+        return sharedMessageConverters;
     }
 
     @SuppressWarnings("unchecked")

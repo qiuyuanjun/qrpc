@@ -405,7 +405,7 @@ public class NioRpcServer extends RpcServer {
                     sc.setOption(StandardSocketOptions.TCP_NODELAY, true);
                     sc.setOption(StandardSocketOptions.SO_REUSEADDR, true);
                     sk = sc.register(selector, SelectionKey.OP_READ);
-                    RpcConnection conn = new NioRpcConnection(sk);
+                    RpcConnection conn = new NioRpcConnection(getMessageConverters(), sk);
                     sk.attach(conn);
                 }
                 catch (IOException e) {

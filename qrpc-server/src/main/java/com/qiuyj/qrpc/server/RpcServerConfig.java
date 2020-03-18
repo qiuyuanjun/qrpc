@@ -120,4 +120,15 @@ public class RpcServerConfig {
     private RpcServerConfig() {
         // for private
     }
+
+    @Override
+    public String toString() {
+        return "RpcServerConfig{" +
+                "\n ignoreTypeMismatch=" + ignoreTypeMismatch +
+                ",\n rpcServerClassName='" + rpcServerClassName + '\'' +
+                ",\n asyncServiceRegistrationUnregistrationQueueSize=" + asyncServiceRegistrationUnregistrationQueueSize +
+                ",\n enableServiceRegistration=" + enableServiceRegistration +
+                ",\n port=" + port +
+                "\n}";
+    }
 }

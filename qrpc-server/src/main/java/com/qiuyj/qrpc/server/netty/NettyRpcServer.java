@@ -16,6 +16,7 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
 import java.net.InetSocketAddress;
+import java.util.Objects;
 
 /**
  * 基于netty的rpc服务器的实现
@@ -32,7 +33,10 @@ public class NettyRpcServer extends RpcServer {
 
     @Override
     protected void internalStart(RpcServerConfig config) {
-        serverBootstrap.bind(config.getPort()).syncUninterruptibly();
+        if (Objects.isNull(serverBootstrap)) {
+            configure(config);
+        }
+        serverBootstrap.bind().syncUninterruptibly();
     }
 
     @Override
@@ -57,6 +61,7 @@ public class NettyRpcServer extends RpcServer {
         serverBootstrap = new ServerBootstrap()
                 .channel(channelClass)
                 .group(parentEventLoopGroup, childEventLoopGroup)
+                .localAddress(serverConfig.getPort())
                 .option(ChannelOption.SO_REUSEADDR, true)
                 .childOption(ChannelOption.SO_REUSEADDR, true)
                 .childOption(ChannelOption.TCP_NODELAY, true)
@@ -70,6 +75,6 @@ public class NettyRpcServer extends RpcServer {
 
     @Override
     public InetSocketAddress getLocalAddress() {
-        return null;
+        return (InetSocketAddress) serverBootstrap.config().localAddress();
     }
 }

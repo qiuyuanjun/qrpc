@@ -3,6 +3,7 @@ package com.qiuyj.qrpc.server.nio;
 import com.qiuyj.qrpc.cnxn.AbstractRpcConnection;
 import com.qiuyj.qrpc.logger.InternalLogger;
 import com.qiuyj.qrpc.logger.InternalLoggerFactory;
+import com.qiuyj.qrpc.message.MessageConverters;
 import com.qiuyj.qrpc.utils.UnsafeAccess;
 
 import java.io.IOException;
@@ -40,7 +41,8 @@ class NioRpcConnection extends AbstractRpcConnection {
      */
     private final Object readMessageLock = new Object();
 
-    NioRpcConnection(SelectionKey selectionKey) {
+    NioRpcConnection(MessageConverters messageConverters, SelectionKey selectionKey) {
+        super(messageConverters);
         this.selectionKey = selectionKey;
         this.socketChannel = (SocketChannel) selectionKey.channel();
     }
