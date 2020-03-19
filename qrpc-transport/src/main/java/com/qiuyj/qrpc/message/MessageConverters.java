@@ -91,11 +91,15 @@ public class MessageConverters implements MessageConverter, MessageConverterRegi
 
     private static MessageConverter getMessageConverter(Message message) {
         Object type = message.messageHeaders.removeConverterTypeHeader();
-        MessageConverter converter = type instanceof Integer
-                ? messageConverterMap.get(type)
-                : defaultMessageConverter;
+        MessageConverter converter = null;
+        if (type instanceof Integer) {
+            converter = messageConverterMap.get(type);
+        }
         if (Objects.isNull(converter)) {
-            throw new UnknownMessageTypeException("Can not find out the message converter to encode this message");
+            converter = defaultMessageConverter;
+            if (Objects.isNull(converter)) {
+                throw new UnknownMessageTypeException("Can not find out the message converter to encode this message");
+            }
         }
         return converter;
     }
