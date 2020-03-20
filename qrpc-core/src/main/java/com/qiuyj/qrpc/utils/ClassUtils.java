@@ -27,13 +27,34 @@ public abstract class ClassUtils {
     }
 
     public static ClassLoader getDefaultClassLoader() {
-        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        ClassLoader cl = null;
+        try {
+            cl = Thread.currentThread().getContextClassLoader();
+        }
+        catch (Throwable e) {
+            // ignore
+        }
         if (Objects.isNull(cl)) {
-            cl = ClassUtils.class.getClassLoader(); // 当前线程的类加载器不存在，那么获取当前类的类加载器（一般不为null）
+            try {
+                cl = ClassUtils.class.getClassLoader(); // 当前线程的类加载器不存在，那么获取当前类的类加载器（一般不为null）
+            }
+            catch (Throwable e) {
+                // ignore
+            }
             if (Objects.isNull(cl)) {
-                cl = ClassLoader.getSystemClassLoader(); // 得到当前系统的类加载器（一般是AppClassLoader）
+                try {
+                    cl = ClassLoader.getSystemClassLoader(); // 得到当前系统的类加载器（一般是AppClassLoader）
+                }
+                catch (Throwable e) {
+                    // ignore
+                }
                 if (Objects.isNull(cl)) {
-                    cl = ClassLoader.getPlatformClassLoader(); // 得到平台类加载器（一般是PlatformClassLoader）
+                    try {
+                        cl = ClassLoader.getPlatformClassLoader(); // 得到平台类加载器（一般是PlatformClassLoader）
+                    }
+                    catch (Throwable e) {
+                        // ignore
+                    }
                 }
             }
         }
