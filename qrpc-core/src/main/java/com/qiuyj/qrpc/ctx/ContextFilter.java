@@ -16,6 +16,7 @@ public class ContextFilter implements OrderedFilter {
         RpcContext rpcCtx = RpcContext.initContext();
         Optional.ofNullable(context.getContext())
                 .ifPresent(rpcCtx::addAll);
+        rpcCtx.setInetAddress(context.getRemoteAddress(), context.getLocalAddress());
         try {
             if (isServerSide()) {
                 rpcCtx.serverSide();
@@ -28,6 +29,8 @@ public class ContextFilter implements OrderedFilter {
     }
 
     private boolean isServerSide() {
+        RpcContext rpcCtx = RpcContext.getContext();
+
         return true;
     }
 

@@ -27,6 +27,16 @@ public class QrpcException extends RuntimeException {
      */
     public static final int ERR_CODE_BAD_MESSAGE = 4;
 
+    /**
+     * 消息序列化异常
+     */
+    public static final int ERR_CODE_MESSAGE_SERIALIZE = 5;
+
+    /**
+     * 消息反序列化异常
+     */
+    public static final int ERR_CODE_MESSAGE_DESERIALIZE = 5;
+
   /**
      * 错误码
      */

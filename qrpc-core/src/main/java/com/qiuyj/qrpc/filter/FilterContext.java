@@ -4,6 +4,7 @@ import com.qiuyj.qrpc.ctx.RpcContext;
 import com.qiuyj.qrpc.invoke.MethodInvocation;
 import com.qiuyj.qrpc.invoke.MethodInvoker;
 
+import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -37,6 +38,12 @@ public class FilterContext {
      */
     private Map<String, Object> context;
 
+    private InetSocketAddress localAddress;
+
+    private InetSocketAddress remoteAddress;
+
+    private Object result;
+
     public FilterContext(List<Filter> filters, MethodInvoker invoker, MethodInvocation invocation) {
         this.filters = filters;
         this.invoker = invoker;
@@ -64,7 +71,7 @@ public class FilterContext {
         }
         else {
             // 执行具体的方法
-            invoker.invoke(invocation);
+            result = invoker.invoke(invocation);
         }
     }
 
@@ -85,5 +92,22 @@ public class FilterContext {
 
     public Map<String, Object> getContext() {
         return Objects.nonNull(context) ? Collections.unmodifiableMap(context) : null;
+    }
+
+    public void setInetAddress(InetSocketAddress remoteAddress, InetSocketAddress localAddress) {
+        this.remoteAddress = remoteAddress;
+        this.localAddress = localAddress;
+    }
+
+    public InetSocketAddress getLocalAddress() {
+        return localAddress;
+    }
+
+    public InetSocketAddress getRemoteAddress() {
+        return remoteAddress;
+    }
+
+    public Object getResult() {
+        return result;
     }
 }

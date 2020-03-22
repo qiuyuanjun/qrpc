@@ -1,5 +1,6 @@
 package com.qiuyj.qrpc.ctx;
 
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -42,6 +43,10 @@ public class RpcContext {
 
     private final Map<String, Object> context = new HashMap<>();
 
+    private InetSocketAddress remoteAddress;
+
+    private InetSocketAddress localAddress;
+
     private RpcContext() {
         // for private
     }
@@ -61,6 +66,24 @@ public class RpcContext {
 
     public boolean isServerSide() {
         return Boolean.TRUE.equals(get(KEY_SERVER_SIDE));
+    }
+
+    public InetSocketAddress getRemoteAddress() {
+        return remoteAddress;
+    }
+
+    public InetSocketAddress getLocalAddress() {
+        return localAddress;
+    }
+
+    /**
+     * 设置{@code remoteAddress}和{@code localAddress}
+     * @param remoteAddress {@code remoteAddress}
+     * @param localAddress {@code localAddress}
+     */
+    void setInetAddress(InetSocketAddress remoteAddress, InetSocketAddress localAddress) {
+        this.remoteAddress = remoteAddress;
+        this.localAddress = localAddress;
     }
 
     /**

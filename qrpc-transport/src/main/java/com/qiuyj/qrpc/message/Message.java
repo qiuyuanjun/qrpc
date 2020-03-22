@@ -26,7 +26,7 @@ public class Message implements Serializable {
     /**
      * 附加信息对象
      */
-    private Map<Object, Object> attachments;
+    private Map<String, Object> attachment;
 
     public RpcRequest asRequestPayload() {
         if (!(messagePayload instanceof RpcRequest)) {
@@ -40,5 +40,9 @@ public class Message implements Serializable {
             throw new UnknownMessageTypeException("Not an RpcResult message");
         }
         return (RpcResult) messagePayload;
+    }
+
+    public Map<String, Object> getAttachment() {
+        return attachment;
     }
 }

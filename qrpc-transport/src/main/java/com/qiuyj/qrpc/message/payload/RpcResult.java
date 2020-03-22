@@ -43,6 +43,10 @@ public class RpcResult implements Serializable {
         return Objects.isNull(cause);
     }
 
+    public String getRequestId() {
+        return requestId;
+    }
+
     public Object getResult() {
         return result;
     }
