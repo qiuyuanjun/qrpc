@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * rpc请求对象，用于和客户端发送请求到服务器端的封装对象
@@ -17,9 +16,9 @@ import java.util.stream.Collectors;
  */
 public class RpcRequest implements Serializable {
 
-    private static final String[] EMPTY_STRING_ARRAY = new String[0];
+    private static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
 
-    private static final long serialVersionUID = -8837942011123431741L;
+    private static final long serialVersionUID = 8600692601497985790L;
 
     /**
      * 当次请求id，全局唯一
@@ -37,9 +36,9 @@ public class RpcRequest implements Serializable {
     private String methodName;
 
     /**
-     * 方法参数类型
+     * 要执行的方法参数
      */
-    private String[] methodArgTypes;
+    private Object[] methodArgs;
 
     private RpcRequest() {
         // for private
@@ -57,8 +56,8 @@ public class RpcRequest implements Serializable {
         return methodName;
     }
 
-    public String[] getMethodArgTypes() {
-        return methodArgTypes;
+    public Object[] getMethodArgs() {
+        return methodArgs;
     }
 
     @Override
@@ -67,7 +66,7 @@ public class RpcRequest implements Serializable {
                 "requestId='" + requestId + '\'' +
                 ", interfaceName='" + interfaceName + '\'' +
                 ", methodName='" + methodName + '\'' +
-                ", methodArgTypes=" + Arrays.toString(methodArgTypes) +
+                ", methodArgs=" + Arrays.toString(methodArgs) +
                 '}';
     }
 
@@ -79,7 +78,7 @@ public class RpcRequest implements Serializable {
 
         private String methodName;
 
-        private List<String> methodArgTypes;
+        private List<Object> methodArgs;
 
         public Builder requestId(String requestId) {
             this.requestId = requestId;
@@ -101,31 +100,16 @@ public class RpcRequest implements Serializable {
             return this;
         }
 
-        public Builder addMethodArgType(String methodArgType) {
-            if (Objects.isNull(methodArgTypes)) {
-                methodArgTypes = new ArrayList<>(5);
+        public Builder addMethodArg(Object methodArg) {
+            if (Objects.isNull(methodArgs)) {
+                methodArgs = new ArrayList<>(5);
             }
-            this.methodArgTypes.add(methodArgType);
+            this.methodArgs.add(methodArg);
             return this;
         }
 
-        public Builder addMethodArgType(Class<?> methodArgType) {
-            if (Objects.isNull(methodArgTypes)) {
-                methodArgTypes = new ArrayList<>(5);
-            }
-            this.methodArgTypes.add(methodArgType.getName());
-            return this;
-        }
-
-        public Builder methodArgTypes(String... methodArgTypes) {
-            this.methodArgTypes = new ArrayList<>(List.of(methodArgTypes));
-            return this;
-        }
-
-        public Builder methodArgTypes(Class<?>... methodArgTypes) {
-            this.methodArgTypes = Arrays.stream(methodArgTypes)
-                    .map(Class::getName)
-                    .collect(Collectors.toList());
+        public Builder methodArgs(Object... methodArgs) {
+            this.methodArgs = new ArrayList<>(List.of(methodArgs));
             return this;
         }
 
@@ -139,9 +123,9 @@ public class RpcRequest implements Serializable {
             request.requestId = this.requestId;
             request.interfaceName = this.interfaceName;
             request.methodName = this.methodName;
-            request.methodArgTypes = CollectionUtils.isEmpty(this.methodArgTypes)
-                    ? EMPTY_STRING_ARRAY
-                    : this.methodArgTypes.toArray(EMPTY_STRING_ARRAY);
+            request.methodArgs = CollectionUtils.isEmpty(this.methodArgs)
+                    ? EMPTY_OBJECT_ARRAY
+                    : this.methodArgs.toArray(EMPTY_OBJECT_ARRAY);
             return request;
         }
     }

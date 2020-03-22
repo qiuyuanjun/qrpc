@@ -12,4 +12,10 @@
     <artifactId>qrpc-client</artifactId>
     <packaging>jar</packaging>
 
+    <dependencies>
+        <dependency>
+            <groupId>com.qiuyj</groupId>
+            <artifactId>qrpc-core</artifactId>
+        </dependency>
+    </dependencies>
 </project>

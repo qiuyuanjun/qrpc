@@ -27,6 +27,18 @@ public class RpcResult implements Serializable {
      */
     private Object result;
 
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
+    }
+
+    public void setCause(Throwable cause) {
+        this.cause = cause;
+    }
+
+    public void setResult(Object result) {
+        this.result = result;
+    }
+
     public boolean isSuccess() {
         return Objects.isNull(cause);
     }

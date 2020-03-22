@@ -8,6 +8,8 @@ module qrpc.core {
 
     exports com.qiuyj.qrpc;
     exports com.qiuyj.qrpc.annotation;
+    exports com.qiuyj.qrpc.ctx;
     exports com.qiuyj.qrpc.filter;
+    exports com.qiuyj.qrpc.invoke;
     exports com.qiuyj.qrpc.utils to qrpc.server, qrpc.transport;
 }
