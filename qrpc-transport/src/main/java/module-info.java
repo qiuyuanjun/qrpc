@@ -8,5 +8,4 @@ module qrpc.transport {
     exports com.qiuyj.qrpc.cnxn to qrpc.server;
     exports com.qiuyj.qrpc.message;
     exports com.qiuyj.qrpc.message.converter;
-    exports com.qiuyj.qrpc.message.payload;
 }

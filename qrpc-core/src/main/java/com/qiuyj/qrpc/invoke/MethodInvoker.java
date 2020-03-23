@@ -1,5 +1,7 @@
 package com.qiuyj.qrpc.invoke;
 
+import com.qiuyj.qrpc.message.payload.RpcResult;
+
 /**
  * 方法执行器，用于执行具体的方法
  * @author qiuyj
@@ -13,5 +15,5 @@ public interface MethodInvoker {
      * @param invocation 方法定义
      * @return 方法返回值
      */
-    Object invoke(MethodInvocation invocation);
+    RpcResult invoke(MethodInvocation invocation);
 }

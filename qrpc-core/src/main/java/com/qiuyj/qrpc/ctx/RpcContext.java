@@ -41,7 +41,7 @@ public class RpcContext {
         CONTEXT_HOLDER.remove();
     }
 
-    private final Map<String, Object> context = new HashMap<>();
+    private final Map<String, Object> attachment = new HashMap<>();
 
     private InetSocketAddress remoteAddress;
 
@@ -53,7 +53,7 @@ public class RpcContext {
 
     public void add(String key, Object value) {
         Optional.ofNullable(value)
-                .ifPresentOrElse(v -> context.put(key, v), () -> context.remove(key));
+                .ifPresentOrElse(v -> attachment.put(key, v), () -> attachment.remove(key));
     }
 
     public void addAll(Map<String, Object> map) {
@@ -61,7 +61,7 @@ public class RpcContext {
     }
 
     public Object get(String key) {
-        return context.get(key);
+        return attachment.get(key);
     }
 
     public boolean isServerSide() {
@@ -74,6 +74,10 @@ public class RpcContext {
 
     public InetSocketAddress getLocalAddress() {
         return localAddress;
+    }
+
+    public Map<String, Object> getAttachment() {
+        return attachment;
     }
 
     /**
@@ -90,6 +94,13 @@ public class RpcContext {
      * 设置{@link #KEY_SERVER_SIDE}为{@code true}
      */
     void serverSide() {
-        context.put(KEY_SERVER_SIDE, Boolean.TRUE);
+        attachment.put(KEY_SERVER_SIDE, Boolean.TRUE);
+    }
+
+    /**
+     * 清空上下文
+     */
+    void clearContext() {
+        attachment.clear();
     }
 }

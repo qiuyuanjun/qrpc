@@ -46,6 +46,7 @@ public class NettyRpcServer extends RpcServer {
 
     @Override
     public void configure(RpcServerConfig serverConfig) {
+        super.configure(serverConfig);
         Class<? extends ServerSocketChannel> channelClass;
         EventLoopGroup parentEventLoopGroup, childEventLoopGroup;
         if (Epoll.isAvailable()) {

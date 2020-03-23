@@ -16,8 +16,12 @@ public class ReflectiveMethodInvocation extends MethodInvocation {
                                       Class<?> interfaceClass,
                                       Object o,
                                       Object... methodArgs) {
-        super(interfaceClass, o, methodArgs);
+        super(interfaceClass, o, getMethodArgTypes(m), methodArgs);
         this.m = m;
+    }
+
+    static Class<?>[] getMethodArgTypes(Method m) {
+        return m.getParameterTypes();
     }
 
     @Override
@@ -26,12 +30,12 @@ public class ReflectiveMethodInvocation extends MethodInvocation {
     }
 
     @Override
-    public void proceed() throws InvocationTargetException, MethodInvocationException {
-        try {
-            setMethodInvokeResult(m.invoke(getThis(), getMethodArgs()));
-        }
-        catch (IllegalAccessException e) {
-            // never happen
-        }
+    public String getMethodName() {
+        return m.getName();
+    }
+
+    @Override
+    public Object proceed() throws InvocationTargetException, IllegalAccessException {
+        return m.invoke(getThis(), getMethodArgs());
     }
 }

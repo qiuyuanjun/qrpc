@@ -37,6 +37,11 @@ public class QrpcException extends RuntimeException {
      */
     public static final int ERR_CODE_MESSAGE_DESERIALIZE = 5;
 
+    /**
+     * 执行目标方法报错
+     */
+    public static final int ERR_CODE_INVOKE_TARGET = 6;
+
   /**
      * 错误码
      */

@@ -116,6 +116,7 @@ public class NioRpcServer extends RpcServer {
 
     @Override
     public void configure(RpcServerConfig config) {
+        super.configure(config);
         try {
             ss = ServerSocketChannel.open();
             ss.configureBlocking(false); // 非阻塞

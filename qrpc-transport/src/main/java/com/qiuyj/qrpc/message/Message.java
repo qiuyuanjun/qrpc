@@ -4,7 +4,6 @@ import com.qiuyj.qrpc.message.payload.RpcRequest;
 import com.qiuyj.qrpc.message.payload.RpcResult;
 
 import java.io.Serializable;
-import java.util.Map;
 
 /**
  * rpc报文封装对象
@@ -12,6 +11,8 @@ import java.util.Map;
  * @since 2020-03-15
  */
 public class Message implements Serializable {
+
+    private static final long serialVersionUID = 6241553450704810609L;
 
     /**
      * 消息头信息
@@ -23,10 +24,21 @@ public class Message implements Serializable {
      */
     private Object messagePayload;
 
-    /**
-     * 附加信息对象
-     */
-    private Map<String, Object> attachment;
+    public MessageHeaders getMessageHeaders() {
+        return messageHeaders;
+    }
+
+    public void setMessageHeaders(MessageHeaders messageHeaders) {
+        this.messageHeaders = messageHeaders;
+    }
+
+    public Object getMessagePayload() {
+        return messagePayload;
+    }
+
+    public void setMessagePayload(Object messagePayload) {
+        this.messagePayload = messagePayload;
+    }
 
     public RpcRequest asRequestPayload() {
         if (!(messagePayload instanceof RpcRequest)) {
@@ -42,7 +54,4 @@ public class Message implements Serializable {
         return (RpcResult) messagePayload;
     }
 
-    public Map<String, Object> getAttachment() {
-        return attachment;
-    }
 }

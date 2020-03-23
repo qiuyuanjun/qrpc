@@ -1,8 +1,9 @@
-package com.qiuyj.qrpc.filter;
+package com.qiuyj.qrpc.ctx;
 
-import com.qiuyj.qrpc.ctx.RpcContext;
+import com.qiuyj.qrpc.filter.Filter;
 import com.qiuyj.qrpc.invoke.MethodInvocation;
 import com.qiuyj.qrpc.invoke.MethodInvoker;
+import com.qiuyj.qrpc.message.payload.RpcResult;
 
 import java.net.InetSocketAddress;
 import java.util.Collections;
@@ -42,7 +43,10 @@ public class FilterContext {
 
     private InetSocketAddress remoteAddress;
 
-    private Object result;
+    /**
+     * 执行结果
+     */
+    private RpcResult result;
 
     public FilterContext(List<Filter> filters, MethodInvoker invoker, MethodInvocation invocation) {
         this.filters = filters;
@@ -72,11 +76,26 @@ public class FilterContext {
         else {
             // 执行具体的方法
             result = invoker.invoke(invocation);
+            // 方法执行完毕，那么清空上下文信息
+            clearContext();
         }
+    }
+
+    private void clearContext() {
+        context.clear();
+        RpcContext.getContextIfAvailable().ifPresent(RpcContext::clearContext);
     }
 
     public Class<?> getInterface() {
         return invocation.getInterfaceClass();
+    }
+
+    public Class<?>[] getMethodArgTypes() {
+        return invocation.getMethodArgTypes();
+    }
+
+    public Object[] getMethodArgs() {
+        return invocation.getMethodArgs();
     }
 
     public void addContextValue(String key, Object value) {
@@ -107,7 +126,7 @@ public class FilterContext {
         return remoteAddress;
     }
 
-    public Object getResult() {
+    public RpcResult getResult() {
         return result;
     }
 }

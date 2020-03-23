@@ -1,10 +1,11 @@
 package com.qiuyj.qrpc.server;
 
 import com.qiuyj.qrpc.QrpcException;
+import com.qiuyj.qrpc.ctx.RpcContext;
 import com.qiuyj.qrpc.filter.Filter;
-import com.qiuyj.qrpc.filter.FilterContext;
+import com.qiuyj.qrpc.ctx.FilterContext;
+import com.qiuyj.qrpc.invoke.AbstractMethodInvoker;
 import com.qiuyj.qrpc.invoke.MethodInvocation;
-import com.qiuyj.qrpc.invoke.MethodInvoker;
 import com.qiuyj.qrpc.message.Message;
 import com.qiuyj.qrpc.message.MessageUtils;
 import com.qiuyj.qrpc.message.payload.RpcRequest;
@@ -15,13 +16,14 @@ import com.qiuyj.qrpc.utils.ClassUtils;
 import com.qiuyj.qrpc.utils.CollectionUtils;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 服务器端的方法执行器
  * @author qiuyj
  * @since 2020-03-22
  */
-class ServerSideMethodInvoker implements MethodInvoker {
+class ServerSideMethodInvoker extends AbstractMethodInvoker {
 
     private ServiceDescriptorContainer serviceDescriptorContainer;
 
@@ -35,13 +37,18 @@ class ServerSideMethodInvoker implements MethodInvoker {
     public Message invoke(Message requestMsg) {
         RpcRequest request = requestMsg.asRequestPayload();
         MethodInvocation invocation = createInvocation(request);
-        FilterContext fCtx = CollectionUtils.isEmpty(requestMsg.getAttachment())
+        FilterContext fCtx = CollectionUtils.isEmpty(request.getAttachment())
                 ? new FilterContext(filters, this, invocation)
-                : new FilterContext(requestMsg.getAttachment(), filters, this, invocation);
+                : new FilterContext(request.getAttachment(), filters, this, invocation);
         fCtx.fireNextFilter();
-        RpcResult result = (RpcResult) fCtx.getResult();
-        // 从request请求里面获取requestId，并设置到result里面
-        result.setRequestId(request.getRequestId());
+        RpcResult result = fCtx.getResult();
+        // 给RpcResult设置attachment
+        if (RpcContext.getContextIfAvailable().isPresent()) {
+            RpcContext.getContext().getAttachment().forEach(result::addAttachment);
+        }
+        else {
+            Optional.ofNullable(fCtx.getContext()).ifPresent(c -> c.forEach(result::addAttachment));
+        }
         return MessageUtils.resultMessage(result);
     }
 
@@ -60,16 +67,7 @@ class ServerSideMethodInvoker implements MethodInvoker {
     }
 
     @Override
-    public RpcResult invoke(MethodInvocation invocation) {
-        RpcResult result = new RpcResult();
-        try {
-            invocation.proceed();
-            result.setResult(invocation.getMethodInvokeResult());
-        }
-        catch (Throwable t) {
-            // 执行失败，将错误信息设置，方便后续{@code ExceptionFilter}过滤器注解处理
-            result.setCause(t);
-        }
-        return result;
+    protected Object internalInvoke(MethodInvocation invocation) throws Throwable {
+        return invocation.proceed();
     }
 }

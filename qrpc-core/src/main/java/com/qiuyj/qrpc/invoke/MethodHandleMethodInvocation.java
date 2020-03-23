@@ -14,19 +14,28 @@ public class MethodHandleMethodInvocation extends MethodInvocation {
 
     private final MethodHandle mh;
 
-    public MethodHandleMethodInvocation(MethodHandle mh,
+    private String methodName;
+
+    public MethodHandleMethodInvocation(String methodName,
+                                        MethodHandle mh,
                                         Class<?> interfaceClass,
                                         Object o,
                                         Object... methodArgs) {
-        super(interfaceClass, o, methodArgs);
+        super(interfaceClass, o, getMethodArgTypes(mh), methodArgs);
+        this.methodName = methodName;
         this.mh = mh;
+    }
+
+    private static Class<?>[] getMethodArgTypes(MethodHandle mh) {
+        return mh.type().parameterArray();
     }
 
     public MethodHandleMethodInvocation(Method m,
                                         Class<?> interfaceClass,
                                         Object o,
                                         Object... methodArgs) {
-        super(interfaceClass, o, methodArgs);
+        super(interfaceClass, o, ReflectiveMethodInvocation.getMethodArgTypes(m), methodArgs);
+        this.methodName = m.getName();
         try {
             // 所有的rpc服务，均已invokevirtual指令调用
             this.mh = MethodHandles.publicLookup()
@@ -48,7 +57,12 @@ public class MethodHandleMethodInvocation extends MethodInvocation {
     }
 
     @Override
-    public void proceed() throws Throwable {
-        setMethodInvokeResult(mh.bindTo(getThis()).invokeWithArguments(getMethodArgs()));
+    public String getMethodName() {
+        return methodName;
+    }
+
+    @Override
+    public Object proceed() throws Throwable {
+        return mh.bindTo(getThis()).invokeWithArguments(getMethodArgs());
     }
 }

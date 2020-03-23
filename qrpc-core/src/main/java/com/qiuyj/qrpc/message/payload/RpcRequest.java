@@ -6,7 +6,9 @@ import com.qiuyj.qrpc.utils.StringUtils;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -18,12 +20,7 @@ public class RpcRequest implements Serializable {
 
     private static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
 
-    private static final long serialVersionUID = 8600692601497985790L;
-
-    /**
-     * 当次请求id，全局唯一
-     */
-    private String requestId;
+    private static final long serialVersionUID = -796588684501963088L;
 
     /**
      * 客户端调用的rpc接口
@@ -40,13 +37,10 @@ public class RpcRequest implements Serializable {
      */
     private Object[] methodArgs;
 
-    private RpcRequest() {
-        // for private
-    }
-
-    public String getRequestId() {
-        return requestId;
-    }
+    /**
+     * 附加信息
+     */
+    private Map<String, Object> attachment;
 
     public String getInterfaceName() {
         return interfaceName;
@@ -60,19 +54,55 @@ public class RpcRequest implements Serializable {
         return methodArgs;
     }
 
+    public Map<String, Object> getAttachment() {
+        return attachment;
+    }
+
+    public void setInterfaceName(String interfaceName) {
+        this.interfaceName = interfaceName;
+    }
+
+    public void setMethodName(String methodName) {
+        this.methodName = methodName;
+    }
+
+    public void setMethodArgs(Object[] methodArgs) {
+        this.methodArgs = methodArgs;
+    }
+
+    public void setAttachment(Map<String, Object> attachment) {
+        this.attachment = attachment;
+    }
+
+    public void addAttachment(String key, Object value) {
+        this.attachment = addAttachment(attachment, key, value);
+    }
+
+    static Map<String, Object> addAttachment(Map<String, Object> attachment, String key, Object value) {
+        if (Objects.nonNull(attachment) && Objects.nonNull(value)) {
+            attachment.put(key, value);
+        }
+        else if (Objects.nonNull(attachment)) {
+            attachment.remove(key);
+        }
+        else if (Objects.nonNull(value)) {
+            attachment = new HashMap<>();
+            attachment.put(key, value);
+        }
+        return attachment;
+    }
+
     @Override
     public String toString() {
         return "RpcRequest{" +
-                "requestId='" + requestId + '\'' +
-                ", interfaceName='" + interfaceName + '\'' +
+                "interfaceName='" + interfaceName + '\'' +
                 ", methodName='" + methodName + '\'' +
                 ", methodArgs=" + Arrays.toString(methodArgs) +
+                ", attachment=" + attachment +
                 '}';
     }
 
     public static class Builder {
-
-        private String requestId;
 
         private String interfaceName;
 
@@ -80,10 +110,7 @@ public class RpcRequest implements Serializable {
 
         private List<Object> methodArgs;
 
-        public Builder requestId(String requestId) {
-            this.requestId = requestId;
-            return this;
-        }
+        private Map<String, Object> attachment;
 
         public Builder interfaceName(String interfaceName) {
             this.interfaceName = interfaceName;
@@ -113,19 +140,29 @@ public class RpcRequest implements Serializable {
             return this;
         }
 
+        public Builder addAttachment(String key, Object value) {
+            this.attachment = RpcRequest.addAttachment(this.attachment, key, value);
+            return this;
+        }
+
+        public Builder attachment(Map<String, Object> attachment) {
+            this.attachment = attachment;
+            return this;
+        }
+
         public RpcRequest build() {
-            if (StringUtils.isEmpty(requestId)
-                    || StringUtils.isEmpty(interfaceName)
-                    || StringUtils.isEmpty(methodName)) {
-                throw new IllegalArgumentException("requestId, interfaceName and methodName must not be empty");
+            if (StringUtils.isEmpty(interfaceName) || StringUtils.isEmpty(methodName)) {
+                throw new IllegalArgumentException("The interfaceName and methodName must not be empty");
             }
             RpcRequest request = new RpcRequest();
-            request.requestId = this.requestId;
             request.interfaceName = this.interfaceName;
             request.methodName = this.methodName;
             request.methodArgs = CollectionUtils.isEmpty(this.methodArgs)
                     ? EMPTY_OBJECT_ARRAY
                     : this.methodArgs.toArray(EMPTY_OBJECT_ARRAY);
+            if (!CollectionUtils.isEmpty(this.attachment)) {
+                request.attachment = this.attachment;
+            }
             return request;
         }
     }

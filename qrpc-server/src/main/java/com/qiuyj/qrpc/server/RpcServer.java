@@ -2,6 +2,7 @@ package com.qiuyj.qrpc.server;
 
 import com.qiuyj.qrpc.QrpcThread;
 import com.qiuyj.qrpc.cnxn.RpcConnection;
+import com.qiuyj.qrpc.invoke.MethodInvoker;
 import com.qiuyj.qrpc.logger.InternalLogger;
 import com.qiuyj.qrpc.logger.InternalLoggerFactory;
 import com.qiuyj.qrpc.message.converter.MessageConverter;
@@ -56,6 +57,8 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar, MessageC
      */
     private MessageConverters messageConverters;
 
+    private MethodInvoker methodInvoker;
+
     protected RpcServer(RpcServerConfig config, ServiceDescriptorContainer serviceDescriptorContainer) {
         this.config = config;
         this.serviceDescriptorContainer = serviceDescriptorContainer;
@@ -66,7 +69,7 @@ public abstract class RpcServer implements Lifecycle, ServiceRegistrar, MessageC
     }
 
     public void configure(RpcServerConfig serverConfig) {
-        // do nothing
+        methodInvoker = new ServerSideMethodInvoker(serviceDescriptorContainer, List.of());
     }
 
     public int getPort() {
