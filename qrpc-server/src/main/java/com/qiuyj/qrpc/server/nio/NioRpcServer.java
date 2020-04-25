@@ -55,7 +55,7 @@ public class NioRpcServer extends RpcServer {
      * 专门用于处理IO操作的线程池（coreNums * 2）
      */
     private ExecutorService workerPool;
-    private AtomicInteger workerPoolThreadCount = new AtomicInteger();
+    private final AtomicInteger workerPoolThreadCount = new AtomicInteger();
 
     public NioRpcServer(RpcServerConfig config, ServiceDescriptorContainer serviceDescriptorContainer) {
         super(config, serviceDescriptorContainer);
@@ -73,6 +73,8 @@ public class NioRpcServer extends RpcServer {
             ss.bind(new InetSocketAddress(config.getPort()));
         }
         catch (IOException e) {
+            // 关闭服务器
+            shutdown();
             throw new IllegalStateException("Binding local port to the server socket channel error", e);
         }
 
@@ -215,7 +217,7 @@ public class NioRpcServer extends RpcServer {
 
     private class AcceptThread extends AbstractSelectorThread {
 
-        private List<SelectThread> selectThreads;
+        private final List<SelectThread> selectThreads;
 
         private int selectThreadCursor = -1;
 
@@ -330,7 +332,7 @@ public class NioRpcServer extends RpcServer {
 
     class SelectThread extends AbstractSelectorThread {
 
-        private Queue<SocketChannel> acceptSocketChannelQueue = new ConcurrentLinkedQueue<>();
+        private final Queue<SocketChannel> acceptSocketChannelQueue = new ConcurrentLinkedQueue<>();
 
         private SelectThread(int i) {
             super("NioSelect-" + i);
